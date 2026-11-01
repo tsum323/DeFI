@@ -35,5 +35,16 @@ ai_researcher:
   api_key_env: ANTHROPIC_API_KEY
   max_hypotheses_per_cycle: 5
 
+signal_engine:
+  validity_days: 7                 # a signal expires after this
+  max_data_age_minutes: 90         # older market data -> WAIT ("data not current")
+  min_volume_24h_usd: 100000       # pool activity filter
+  min_oos_positive_segments: 5     # of 7: excess over the passive LP > 0
+  require_positive_oos_roi: true   # mean absolute OOS ROI must be > 0 (SPEC 11.4)
+  max_mean_drawdown: 0.30
+  capital_usd: 10000
+  fee_lookback_days: [7, 30]       # fee estimate range from these windows
+  price_scenarios: [-0.20, -0.10, -0.05, 0.0, 0.05, 0.10, 0.20]
+
 scheduler:
   max_parallel_heavy_jobs: 1

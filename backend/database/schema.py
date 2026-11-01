@@ -179,6 +179,42 @@ hypothesis_experiments = Table(
 )
 
 
+# ------------------------------------------------------------ signals
+signals = Table(  # append-only: one row per issued signal, never updated
+    "signals", metadata,
+    Column("id", Integer, primary_key=True, autoincrement=True),
+    Column("created_at", BigInteger, nullable=False),
+    Column("block", BigInteger, nullable=False),
+    Column("pool", String(64), nullable=False),
+    Column("signal_type", String(24), nullable=False),  # OPEN CANDIDATE | WAIT | ...
+    Column("spec_hash", String(64)),
+    Column("payload_json", Text, nullable=False),        # full SPEC 11.3 content
+    Column("label", String(16), nullable=False, default="SCENARIO"),
+    Column("parent_id", Integer),                        # signal this one follows up
+)
+
+signal_events = Table(  # status history of signals (monitoring, SPEC 11.5)
+    "signal_events", metadata,
+    Column("id", Integer, primary_key=True, autoincrement=True),
+    Column("signal_id", Integer, nullable=False, index=True),
+    Column("created_at", BigInteger, nullable=False),
+    Column("block", BigInteger, nullable=False),
+    Column("status", String(24), nullable=False),
+    Column("reason", Text, nullable=False),
+    Column("details_json", Text),
+)
+
+market_evaluations = Table(  # every evaluation, including ones that changed nothing
+    "market_evaluations", metadata,
+    Column("id", Integer, primary_key=True, autoincrement=True),
+    Column("created_at", BigInteger, nullable=False),
+    Column("block", BigInteger, nullable=False),
+    Column("decision", String(24), nullable=False),
+    Column("snapshot_json", Text, nullable=False),
+    Column("reasons_json", Text, nullable=False),
+)
+
+
 def big_int_columns(spec: EventSpec) -> set[str]:
     t = event_tables.get(spec.table, pool_created_table)
     return {n for n, typ, _ in spec.fields
@@ -209,4 +245,5 @@ def make_engine(url: str) -> Engine:
 
 __all__ = ["metadata", "pools", "blocks", "raw_logs", "sync_state", "sync_gaps",
            "event_tables", "pool_created_table", "strategies", "datasets", "experiments",
-           "validation_reports", "hypotheses", "hypothesis_experiments", "make_engine"]
+           "validation_reports", "hypotheses", "hypothesis_experiments", "signals", "signal_events",
+           "market_evaluations", "make_engine"]

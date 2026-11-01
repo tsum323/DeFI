@@ -1,0 +1,94 @@
+{
+ "decision": "WAIT",
+ "signal_id": 1,
+ "snapshot": {
+  "block": 26321343,
+  "timestamp": 1793553227,
+  "data_age_seconds": 1148,
+  "sqrt_price": "2213051247629614158610587675202",
+  "tick": 66599,
+  "price": 78023.20292222078,
+  "active_liquidity": 2466932215460,
+  "tvl_token0": 14674516580,
+  "tvl_token1": 9811147679148,
+  "tvl_usd": 21260675.528216332,
+  "volume_24h_usd": 892824.18843,
+  "volume_7d_usd": 64847340.89137,
+  "fees_7d_usd": 194542.02267411,
+  "fee_apr_7d": 0.47712392219691724,
+  "volume_30d_usd": 100112781.182964,
+  "fee_apr_30d": 0.17187207943268717,
+  "median_daily_volume_30d_usd": 1683855.21197,
+  "vol_1d": 0.11578989273204009,
+  "vol_7d": 0.3699256638267815,
+  "vol_30d": 0.33772475371735045,
+  "change_7d": -0.030425976628273288,
+  "change_30d": -0.08432666152239532,
+  "trend": "flat",
+  "vol_class": "low",
+  "base_fee_wei": 45024759,
+  "eth_usd": 2252.73
+ },
+ "payload": {
+  "type": "WAIT",
+  "created_at": 1793554375,
+  "block": 26321343,
+  "pool": "wbtc_usdc_3000",
+  "pair": "WBTC/USDC",
+  "network": "ethereum",
+  "pool_address": "0x99ac8cA7087fA4A2A1FB6357269965A2014ABc35",
+  "fee_tier": 0.003,
+  "current_price": 78023.20292222078,
+  "reasons": [
+   {
+    "name": "no_validated_strategy",
+    "passed": false,
+    "value": "0 of 291 strategies pass all filters",
+    "threshold": "all SPEC 11.4 checks"
+   }
+  ],
+  "closest_candidates": [
+   {
+    "strategy": "w0.3_r1=0.7_exit_d0",
+    "failed": [
+     "stable_across_periods"
+    ],
+    "oos_mean_excess": 0.0326,
+    "oos_mean_roi": 0.019275239671428572
+   },
+   {
+    "strategy": "w0.3_r1=0.7_exit_d300",
+    "failed": [
+     "stable_across_periods"
+    ],
+    "oos_mean_excess": 0.0317,
+    "oos_mean_roi": 0.018356368571428573
+   },
+   {
+    "strategy": "w0.3_r1=0.7_exit_d7200",
+    "failed": [
+     "stable_across_periods"
+    ],
+    "oos_mean_excess": 0.0299,
+    "oos_mean_roi": 0.01656042341428571
+   },
+   {
+    "strategy": "w0.2_r1=0.7_static",
+    "failed": [
+     "stable_across_periods"
+    ],
+    "oos_mean_excess": 0.027,
+    "oos_mean_roi": 0.013678296757142857
+   },
+   {
+    "strategy": "w0.3_r1=0.7_static",
+    "failed": [
+     "stable_across_periods"
+    ],
+    "oos_mean_excess": 0.026,
+    "oos_mean_roi": 0.012630009828571428
+   }
+  ],
+  "label": "SCENARIO"
+ }
+}
