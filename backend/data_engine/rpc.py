@@ -52,6 +52,10 @@ class EndpointUnavailable(RuntimeError):
     """Transport-level failure after all retries (network, 403, 429, 5xx)."""
 
 
+class RateLimited(EndpointUnavailable):
+    """HTTP 429 persisted through all retries."""
+
+
 class BadEndpointConfig(ValueError):
     pass
 
@@ -124,7 +128,8 @@ class RpcClient:
             if attempt < self.max_retries:
                 delay = self.backoff[min(attempt, len(self.backoff) - 1)]
                 time.sleep(delay * (0.75 + random.random() / 2))
-        raise EndpointUnavailable(f"[{self.name}] unavailable after retries: {last_exc}")
+        cls = RateLimited if last_exc == "HTTP 429" else EndpointUnavailable
+        raise cls(f"[{self.name}] unavailable after retries: {last_exc}")
 
     @staticmethod
     def _json_error_body(exc: urllib.error.HTTPError) -> dict | None:
@@ -173,7 +178,14 @@ class RpcClient:
             assert_read_only(m, p)
         payload = [{"jsonrpc": "2.0", "id": i, "method": m, "params": p}
                    for i, (m, p) in enumerate(calls)]
-        resp = self._post(payload)
+        try:
+            resp = self._post(payload)
+        except RateLimited:
+            # Large batches cost many compute units at once; split and retry.
+            if len(calls) == 1:
+                raise
+            mid = len(calls) // 2
+            return self.batch(calls[:mid]) + self.batch(calls[mid:])
         if not isinstance(resp, list) or len(resp) != len(calls):
             return [self.call(m, p) for m, p in calls]
         by_id = {r.get("id"): r for r in resp}

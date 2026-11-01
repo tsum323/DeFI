@@ -252,3 +252,35 @@ def test_rpc_sends_explicit_user_agent(monkeypatch):
     monkeypatch.setattr(urllib.request, "urlopen", fake)
     RpcClient("t", "https://example.invalid/rpc", max_retries=0).chain_id()
     assert seen["ua"] and "python-urllib" not in seen["ua"].lower()
+
+
+def test_batch_splits_on_persistent_http_429(monkeypatch):
+    # SYNTHETIC: endpoint rejects batches larger than 2 with HTTP 429.
+    import urllib.request
+
+    class Resp:
+        def __init__(self, body):
+            self.body = body
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return False
+
+        def read(self):
+            return self.body
+
+    sizes = []
+
+    def fake(req, *a, **k):
+        payload = json.loads(req.data)
+        sizes.append(len(payload))
+        if len(payload) > 2:
+            raise _http_error(429, b"Too Many Requests")
+        return Resp(json.dumps([{"jsonrpc": "2.0", "id": x["id"], "result": hex(x["id"])}
+                                for x in payload]).encode())
+    monkeypatch.setattr(urllib.request, "urlopen", fake)
+    c = RpcClient("t", "https://example.invalid/rpc", max_retries=0)
+    out = c.batch([("eth_blockNumber", [])] * 8)
+    assert len(out) == 8 and sizes == [8, 4, 2, 2, 4, 2, 2]
