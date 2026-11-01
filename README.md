@@ -9,7 +9,8 @@
 > (`backend/core/safety.py`, `tests/test_safety.py`).
 
 ## Статус
-Этап 1 (исследование и архитектура) завершён — см. [ROADMAP.md](ROADMAP.md).
+Этап 1 завершён. Этап 2 (Data Engine): код и тесты готовы, реальная загрузка ждёт
+рабочего ключа RPC — см. [ROADMAP.md](ROADMAP.md).
 
 ## Документация
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — модули, поток данных, схема БД, безопасность
@@ -22,6 +23,9 @@
 pip install -r requirements.txt
 python -m pytest                         # тесты конфигурации и безопасности
 python -m scripts.check_data_sources     # проверка доступности RPC
+python -m scripts.verify_pools           # подтверждение пулов on-chain
+python -m scripts.compare_fee_tiers      # выбор основного fee tier
+python -m scripts.sync_pool              # загрузка истории событий пула
 ```
 Для реальных данных: `export ETH_RPC_URL=<archive RPC URL>`.
 

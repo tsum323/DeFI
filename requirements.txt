@@ -4,8 +4,9 @@ pyyaml==6.0.3
 pydantic==2.14.2
 eth-hash[pycryptodome]==0.8.0
 pytest==9.2.0
+# Stage 2 (data engine; RPC via stdlib urllib — web3/httpx not needed so far)
+sqlalchemy==2.1.6
 # Planned (added when the stage that needs them starts):
-#   Stage 2: web3==8.0.0, httpx==0.28.1, sqlalchemy==2.1.6
 #   Stage 3+: numpy==2.5.3, pandas==3.0.5, scipy==1.18.1
 #   Stage 6: optuna==5.0.0
 #   Stage 7: anthropic==2.3.0

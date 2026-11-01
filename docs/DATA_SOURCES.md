@@ -21,26 +21,21 @@ OHLCV-свечи и агрегаты субграфа (`poolDayData.feesUSD`) **
 - Остальные топики вычисляются кодом из сигнатур `IUniswapV3PoolEvents.sol` и
   покрываются тестом на этапе 2.
 
-## 2. Проверка доступности (2026-11-01, эта облачная сессия)
+## 2. Проверка доступности
 
-| Хост | Результат |
+### 2026-11-01, этап 2 (текущее состояние)
+| Endpoint | Результат |
 |---|---|
-| ethereum-rpc.publicnode.com, eth.llamarpc.com, rpc.ankr.com, cloudflare-eth.com, eth.drpc.org, 1rpc.io | **403 — заблокировано политикой сети окружения** |
-| gateway.thegraph.com, api.etherscan.io, api.dune.com, api.coingecko.com, docs.uniswap.org, Alchemy, Infura, Hypersync | недоступно (заблокировано) |
-| bigquery.googleapis.com | доступен, но нет учётных данных GCP |
-| api.anthropic.com | доступен (нужен `ANTHROPIC_API_KEY`) |
-| github / raw.githubusercontent, PyPI, npm | доступны |
+| `user_rpc` (`ETH_RPC_URL`, хост eth-mainnet.g.alchemy.com) | **хост доступен**, но значение переменной — незаполненный шаблон (в месте ключа кириллица). `RpcClient` распознаёт это и сообщает `MISCONFIGURED`, URL не выводится |
+| `alchemy_demo` (публичный demo-ключ Alchemy) | отвечает эпизодически, в основном HTTP 429; годится только для единичных проверок |
+| publicnode, drpc | по-прежнему 403 — политика сети окружения |
 
-**Вывод:** в текущем окружении реальные данные блокчейна загрузить нельзя.
-Код этапа 2 будет написан и покрыт тестами, но реальная загрузка требует одного из:
+Что успели подтвердить через demo-ключ: `head = 26319563`;
+`Factory.getPool(WBTC, USDC, 500) = 0x9a772018FbD77fcD2d25657e5C547BAfF3Fd7D16` — совпадает с CREATE2.
+Остальное (0.30%, блоки создания, активность) ждёт рабочего ключа.
 
-1. **Рекомендуется:** разрешить в настройках окружения домен archive-RPC
-   (Alchemy / Infura / QuickNode / собственный узел) и задать `ETH_RPC_URL`.
-   Archive нужен для контрольных точек; логи можно брать и с full-узла.
-2. Разрешить публичный RPC (`ethereum-rpc.publicnode.com`, `eth.drpc.org`) —
-   хватит для логов, но без archive-сверок и с жёсткими лимитами `eth_getLogs`.
-3. BigQuery `bigquery-public-data.crypto_ethereum.logs` (нужен GCP-проект) —
-   быстрый массовый бэкфилл, затем догрузка через RPC.
+### 2026-11-01, этап 1
+Все публичные RPC и индексаторы были заблокированы (403); BigQuery доступен без учётных данных GCP.
 
 Проверка повторяется командой `python -m scripts.check_data_sources`.
 
@@ -74,3 +69,16 @@ CREATE2 доказывает, *каким был бы* адрес пула; фа
 - Целостность: непрерывность покрытия окон; совпадение `blockHash` логов с
   заголовком блока; инварианты replay (MATH_CORE §5); выборочная сверка с субграфом.
 - Каждая запись хранит `source` (имя endpoint) — журнал происхождения данных.
+
+## 5. Конвейер этапа 2 (команды)
+
+```bash
+python -m scripts.check_data_sources     # доступность endpoint'ов
+python -m scripts.verify_pools           # getPool, token0/1, fee, tickSpacing, PoolCreated → data/pool_verification.json
+python -m scripts.compare_fee_tiers      # 30 дней: swaps, объём, комиссии LP, TVL, fee/TVL → data/fee_tier_comparison.json
+python -m scripts.sync_pool              # полная история событий primary_pool в БД (возобновляемо)
+```
+
+**Правило выбора основного fee tier:** основным становится пул с большей выручкой LP
+(объём × fee) в USDC за последние 30 дней, при условии ≥ 1000 свопов в окне.
+Если разница меньше 20%, вариант помечается `close_call` и решается вручную.
