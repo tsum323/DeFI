@@ -126,3 +126,13 @@ def test_nested_selection_never_uses_real_oos():
     res = nested_selection(t, [a, b, passive], segs, top=1)
     assert res["picked"][0]["name"] == "w0.3_static"          # chosen without OOS
     assert abs(res["picked_mean_oos_roi"] - (-0.2)) < 1e-9     # honest OOS outcome
+
+
+def test_objective_is_relative_to_passive_and_rejects_idle():
+    from backend.optimizer.optuna_study import PASSIVE_HASH, is_objective
+    segs = [seg(i, "IS") for i in range(4)]
+    idle, lp = StrategyParams(width_pct=0.3, max_vol_entry=1e-9), StrategyParams(width_pct=0.5)
+    # SYNTHETIC: bull market, passive +5% per segment; idle 0%; LP +6% steady
+    t = table_for(segs, {PASSIVE_HASH: [0.05] * 4, idle.spec_hash: [0.0] * 4,
+                         lp.spec_hash: [0.06] * 4})
+    assert is_objective(t, lp.spec_hash, segs) > 0 > is_objective(t, idle.spec_hash, segs)

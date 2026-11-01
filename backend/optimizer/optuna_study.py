@@ -3,8 +3,11 @@
 - Search space covers range width, target token ratio, rebalance rule and its
   parameters, cooldown (re-entry), volatility-scaled width and a volatility
   threshold for exit / re-entry (SPEC §7).
-- Objective = mean IS segment ROI - 0.5 x std of IS segment ROI (consistency
-  matters, not one lucky segment); ruined or failed segments count as -100%.
+- Objective = mean over IS segments of (ROI - ROI of the passive full-range LP on
+  the same segment) - 0.5 x std of that excess (consistency matters, not one
+  lucky segment); ruined or failed segments count as -100%. Measuring against the
+  passive LP removes the degenerate optimum "never enter, sit in USDC" that a
+  raw mean-minus-std objective rewards.
   OOS segments are never evaluated during the search (ARCHITECTURE §4).
 - Trials run in batches through run_segment_table (one replay pass per batch);
   identical strategies are taken from the experiments table, never re-run.
@@ -19,11 +22,13 @@ from pathlib import Path
 
 import optuna
 
-from backend.strategies.generator import DAY, StrategyParams
+from backend.strategies.generator import BASE_STRATEGIES, DAY, StrategyParams
 from backend.strategies.mass_test import _hash
 from backend.validation.segments import Segment, load_segment_table, run_segment_table
 
 ROOT = Path(__file__).resolve().parents[2]
+PASSIVE_PARAMS = BASE_STRATEGIES["passive_full_range"]
+PASSIVE_HASH = PASSIVE_PARAMS.spec_hash
 STORAGE = f"sqlite:///{ROOT / 'data' / 'optuna.sqlite'}"
 
 
@@ -47,28 +52,31 @@ def params_from_trial(trial: optuna.trial.BaseTrial) -> StrategyParams:
     if trial.suggest_categorical("vol_filter", [False, True]):
         kw["max_vol_entry"] = round(trial.suggest_float("max_vol_entry", 0.3, 1.5), 2)
     if "width_vol_mult" in kw or "max_vol_entry" in kw:
-        kw["vol_lookback_seconds"] = trial.suggest_categorical("vol_lookback_days", [1, 3, 7, 14, 30]) * DAY
+        # >= 3 days: the estimator needs >= 24 hourly returns inside the lookback
+        kw["vol_lookback_seconds"] = trial.suggest_categorical("vol_lookback_days", [3, 7, 14, 30]) * DAY
     kw["width_pct"] = round(kw["width_pct"], 4)
     return StrategyParams(**kw).canonical()
 
 
+OBJECTIVE = "mean(IS ROI - passive ROI) - 0.5*std(IS ROI - passive ROI)"
+
+
 def is_objective(table: dict, spec_hash: str, is_segments: list[Segment]) -> float:
-    rois = []
+    excess = []
     for s in is_segments:
         m = table.get((spec_hash, s.index, "base"))
-        if m is None or m.get("ruined"):
-            rois.append(-1.0)
-        else:
-            rois.append(m["net_a"] / m["capital"])
-    if not rois:
+        pm = table.get((PASSIVE_HASH, s.index, "base"))
+        roi = -1.0 if m is None or m.get("ruined") else m["net_a"] / m["capital"]
+        excess.append(roi - (pm["net_a"] / pm["capital"] if pm else 0.0))
+    if not excess:
         return -1.0
-    sd = statistics.stdev(rois) if len(rois) > 1 else 0.0
-    return statistics.fmean(rois) - 0.5 * sd
+    sd = statistics.stdev(excess) if len(excess) > 1 else 0.0
+    return statistics.fmean(excess) - 0.5 * sd
 
 
 def study_name(base_descriptor: dict, is_segments: list[Segment], version: str) -> str:
     return "lp_" + _hash([base_descriptor, [s.index for s in is_segments],
-                          [s.start_block for s in is_segments], version])[:20]
+                          [s.start_block for s in is_segments], version, OBJECTIVE])[:20]
 
 
 def optimize(engine, ds, segments: list[Segment], base_descriptor: dict, *, n_trials: int,
@@ -97,7 +105,7 @@ def optimize(engine, ds, segments: list[Segment], base_descriptor: dict, *, n_tr
         for t, p in zip(trials, params):
             t.set_user_attr("spec_hash", p.spec_hash)
             t.set_user_attr("name", p.name)
-        uniq = list({p.spec_hash: p for p in params}.values())
+        uniq = list({p.spec_hash: p for p in params + [PASSIVE_PARAMS]}.values())
         st = run_segment_table(engine, ds, uniq, is_segments, base_descriptor, variants_is=("base",),
                                variants_oos=(), batch=len(uniq))
         table = load_segment_table(engine, base_descriptor, is_segments, st["code_version"])

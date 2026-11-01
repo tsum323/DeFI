@@ -20,7 +20,7 @@ from sqlalchemy import insert
 from backend.backtesting.dataset import ROOT, load_dataset
 from backend.core.config import load_config
 from backend.database import schema as S
-from backend.optimizer.optuna_study import best_params, optimize
+from backend.optimizer.optuna_study import OBJECTIVE, best_params, optimize
 from backend.strategies.generator import BASE_STRATEGIES
 from backend.strategies.mass_test import dataset_descriptor, relabel_commit_versions
 from backend.validation.robustness import score_strategies
@@ -80,13 +80,14 @@ def main() -> None:
     trials = [{"number": t.number, "value": t.value, "params": t.params, **t.user_attrs}
               for t in study.trials if t.value is not None]
     out.write_text(json.dumps({"study": study.study_name, "code_version": version, "dataset": base,
-                               "objective": "mean(IS ROI) - 0.5*std(IS ROI)", "label": "MODELED",
+                               "objective": OBJECTIVE, "label": "MODELED",
                                "trials": trials,
                                "top": [{"params": asdict(c), **asdict(reports[c.spec_hash])}
                                        for c in cands]}, indent=1) + "\n")
 
     def pct(x):
         return "   n/a" if x is None else f"{x:+6.1%}"
+    print(f"objective: {OBJECTIVE}")
     print(f"{'strategy':48s} IS obj  IS ROI OOS ROI vsPass OOS+ beatH score flags")
     by_obj = {t.user_attrs.get("spec_hash"): t.value for t in study.trials if t.value is not None}
     for c in cands:
