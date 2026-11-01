@@ -86,3 +86,30 @@ def test_make_segments_roles_and_regimes():
     assert all(a.end_block < b.start_block for a, b in zip(segs, segs[1:]))
     assert {s.vol_class for s in segs} <= {"high", "low"}
     assert {s.trend for s in segs} <= {"up", "down", "flat"}
+
+
+def test_optuna_optimizes_on_is_only_and_resumes(tmp_path):
+    import optuna
+
+    from backend.database import schema as S
+    from backend.optimizer.optuna_study import best_params, optimize, params_from_trial
+    from backend.validation.segments import load_segment_table
+    events, blocks = synthetic_history(n_swaps=900, drift=0.1, seed=12)
+    blocks = {b: (T0 + 600 * (b - B0), bf) for b, (_, bf) in blocks.items()}
+    ds = dataset(events, blocks)
+    segs = make_segments(ds, T0 + 3600, T0 + 600 * 900, days=1, oos_segments=2)
+    engine = S.make_engine(f"sqlite:///{tmp_path / 'lab.sqlite'}")
+    storage = f"sqlite:///{tmp_path / 'optuna.sqlite'}"
+    base = {"pool": "synthetic", "capital_token1": 10 ** 12, "gas_set": "gas_units",
+            "priority_fee_gwei": 1.0}
+    st = optimize(engine, ds, segs, base, n_trials=4, batch=2, storage=storage)
+    assert len([t for t in st.trials if t.state == optuna.trial.TrialState.COMPLETE]) == 4
+    st2 = optimize(engine, ds, segs, base, n_trials=6, batch=2, storage=storage)  # resume
+    assert st2.study_name == st.study_name and len(st2.trials) == 6
+    table = load_segment_table(engine, base, segs)
+    oos = {s.index for s in segs if s.role == "OOS"}
+    assert table and all(k[1] not in oos for k in table)  # OOS never evaluated during search
+    top = best_params(st2, 3)
+    assert top and len({p.spec_hash for p in top}) == len(top)
+    p = params_from_trial(optuna.trial.FixedTrial(st2.best_trial.params))
+    assert p.spec_hash == st2.best_trial.user_attrs["spec_hash"]
