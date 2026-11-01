@@ -86,6 +86,13 @@ def main() -> None:
     if not db.exists() or db.stat().st_size < 10 ** 8:
         print("no database in cache: restoring from data_snapshots/", flush=True)
         run("scripts.data_snapshot", "restore")
+    # Side files (pool verification, ETH/USD history, ...) are not in the Actions cache
+    # with the database: always take missing ones from the committed snapshot.
+    from scripts.data_snapshot import SIDE_FILES
+    snap = ROOT / "data_snapshots" / cfg.primary_pool
+    for name in SIDE_FILES:
+        if (snap / name).exists() and not (ROOT / "data" / name).exists():
+            shutil.copy2(snap / name, ROOT / "data" / name)
     run("scripts.data_snapshot", "restore-research")  # idempotent: merges the saved state
     engine = S.make_engine(cfg.lab["database"]["url"])
     before = latest_signal(engine)
