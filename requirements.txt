@@ -10,6 +10,8 @@ sqlalchemy==2.1.6
 optuna==5.0.0
 # Stage 7 (AI researcher: Claude via the official SDK)
 anthropic==2.3.0
+# Stage 10 (dashboard API)
+fastapi==0.162.0
+uvicorn==0.54.0
 # Planned (added when the stage that needs them starts):
 #   Stage 3+: numpy==2.5.3, pandas==3.0.5, scipy==1.18.1
-#   API:     fastapi==0.162.0, uvicorn==0.54.0
