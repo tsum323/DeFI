@@ -243,3 +243,47 @@ def test_gas_can_not_drive_equity_far_below_zero():
     # loss is bounded by capital plus at most one action's gas
     one_action = max(a.gas_cost_token1 for a in r.actions)
     assert m["net_a"] >= -m["capital"] - one_action
+
+
+def test_volatility_rules_fee_gas_multipliers_and_start_state_market():
+    from backend.backtesting.position_sim import simulate_many, state_at
+    events, blocks = synthetic_history(n_swaps=900, drift=0.25, seed=9)
+    # SYNTHETIC: one swap per block, 12 s apart -> make blocks 10 min apart so
+    # the hourly volatility estimator has enough samples
+    blocks = {b: (T0 + 600 * (b - B0), bf) for b, (_, bf) in blocks.items()}
+    ds = dataset(events, blocks)
+    base = dict(start_block=B0 + 300, width_pct=0.05, rebalance="on_exit", mark_every_seconds=3600)
+    plain = simulate(ds, spec(**base))
+    volw = simulate(ds, spec(**base, width_vol_mult=0.5, vol_lookback_seconds=86_400))
+    assert (volw.actions[0].tick_upper - volw.actions[0].tick_lower) != \
+        (plain.actions[0].tick_upper - plain.actions[0].tick_lower)
+    gate = simulate(ds, spec(**base, max_vol_entry=1e-6, vol_lookback_seconds=86_400))
+    assert gate.actions == [] and gate.metrics["fees_a"] == 0  # never enters
+    assert gate.metrics["value_hodl"] == gate.metrics["capital"]
+    loose = simulate(ds, spec(**base, max_vol_entry=1e6, vol_lookback_seconds=86_400))
+    assert _strip(loose)[0]["net_a"] == plain.metrics["net_a"]
+    k = simulate(ds, spec(**base, fee_multiplier=0.5))
+    assert abs(k.metrics["fees_a"] - plain.metrics["fees_a"] // 2) <= 1
+    g = simulate(ds, spec(**base, gas_multiplier=2.0))
+    assert g.metrics["gas_cost"] >= 2 * plain.metrics["gas_cost"] - 2
+    for key in ("sharpe_a", "sortino_a", "time_out_of_range", "avg_daily_net_a"):
+        assert key in plain.metrics
+    # cached start state + prefilled market == full replay, also for volatility rules
+    specs = [spec(**base, width_vol_mult=0.5, vol_lookback_seconds=86_400),
+             spec(**base, max_vol_entry=0.5, vol_lookback_seconds=86_400)]
+    full = simulate_many(ds, specs)
+    cached = simulate_many(ds, specs, start_state=state_at(ds, B0 + 299))
+    assert [_strip(r) for r in full] == [_strip(r) for r in cached]
+
+
+def test_poisoned_future_does_not_change_past_decisions_with_vol_rules():
+    ev1, blocks = synthetic_history(n_swaps=600, seed=5, drift=0.2)
+    blocks = {b: (T0 + 600 * (b - B0), bf) for b, (_, bf) in blocks.items()}
+    cut = B0 + 400
+    sp = dict(start_block=B0 + 200, width_pct=0.02, rebalance="edge", edge_fraction=0.6,
+              width_vol_mult=0.8, vol_lookback_seconds=86_400, mark_every_seconds=3600)
+    full = simulate(dataset(ev1, blocks), spec(**sp))
+    short = simulate(dataset([e for e in ev1 if e.block <= cut], blocks), spec(**sp))
+    assert [a for a in full.actions if a.block <= cut] == short.actions
+    assert [r for r in full.timeseries if r["block"] < cut] == \
+        [r for r in short.timeseries if r["block"] < cut]

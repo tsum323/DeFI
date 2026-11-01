@@ -29,6 +29,9 @@ class StrategyParams:
     cooldown_seconds: int = 0
     ratio_token1: float | None = None
     full_range: bool = False
+    width_vol_mult: float | None = None
+    vol_lookback_seconds: int = 7 * DAY
+    max_vol_entry: float | None = None
 
     def canonical(self) -> "StrategyParams":
         """Drop parameters that the rule ignores, so equivalent strategies hash equal."""
@@ -43,6 +46,10 @@ class StrategyParams:
             d["rebalance_delay_blocks"] = 0
         if self.rebalance == "none":
             d["cooldown_seconds"] = 0
+        if self.width_vol_mult is None and self.max_vol_entry is None:
+            d["vol_lookback_seconds"] = 7 * DAY
+        if self.width_vol_mult is not None:
+            d["width_pct"] = self.width_pct  # fallback width while vol is unknown
         return StrategyParams(**d)
 
     @property
@@ -68,6 +75,13 @@ class StrategyParams:
             parts.append(f"edge{c.edge_fraction:g}_d{c.rebalance_delay_blocks}")
         if c.cooldown_seconds:
             parts.append(f"cool{c.cooldown_seconds // 3600}h")
+        if c.width_vol_mult is not None:
+            parts.append(f"volw{c.width_vol_mult:g}")
+        if c.max_vol_entry is not None:
+            parts.append(f"maxvol{c.max_vol_entry:g}")
+        if (c.width_vol_mult is not None or c.max_vol_entry is not None) \
+                and c.vol_lookback_seconds != 7 * DAY:
+            parts.append(f"lb{c.vol_lookback_seconds // DAY}d")
         return "_".join(parts)
 
     def to_spec(self, start_block: int, end_block: int, capital_token1: int,
