@@ -1,5 +1,4 @@
 {
- "optuna": "optuna.sqlite",
  "tables": {
   "datasets": {
    "rows": 43,
@@ -10,8 +9,8 @@
    "sha256": "7bd2cc8ac96c104a488608934fb20daaa10e0b70929747c5320e47b0497a1e44"
   },
   "forward_tests": {
-   "rows": 6,
-   "sha256": "cafea2c1744718a5d16e815267a64f80c220d59141939acf56372a63cd65d08f"
+   "rows": 9,
+   "sha256": "e59ac22bda84e579e86af36b17882e28b124e54bc13366edc06b3858f5a98a35"
   },
   "hypotheses": {
    "rows": 5,
@@ -26,8 +25,8 @@
    "sha256": "e04134c1b590548dce6cad510bb8efaa2b04549d8833b0bbf085b2ee7f8af8b3"
   },
   "market_evaluations": {
-   "rows": 9,
-   "sha256": "76fdaee458df0b41d97c879a4b167a407fbb93a121e67dd36139561756c8e20a"
+   "rows": 11,
+   "sha256": "38a5015270d2ecfdb60a776ec426827129138ae518e9c480de3d2e455eae77b9"
   },
   "signal_events": {
    "rows": 3,
