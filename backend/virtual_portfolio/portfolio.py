@@ -217,6 +217,25 @@ def add_forward_test(engine, params, start_block: int, capital_token1: int, reas
             reason=reason)).inserted_primary_key[0]
 
 
+WATCH_PREFIX = "watch: "
+
+
+def register_watch(engine, watch: list[dict], strategies: dict, start_block: int,
+                   capital_token1: int) -> list[str]:
+    """Put each watch-level strategy on a forward test once (from the block it first
+    appeared on the watch list). Returns the names newly registered."""
+    with engine.connect() as conn:
+        have = set(conn.execute(select(S.forward_tests.c.spec_hash)).scalars())
+    out = []
+    for w in watch:
+        p = strategies.get(w["spec_hash"])
+        if p is None or w["spec_hash"] in have:
+            continue
+        add_forward_test(engine, p, start_block, capital_token1,
+                         f"{WATCH_PREFIX}failed only {w['failed']} ({w['value']}; needs {w['threshold']})")
+        out.append(p.name)
+    return out
+
 def mark_forward_tests(engine, ds: Dataset, state_at_fn, latest_block: int,
                        priority_fee_gwei: float = 1.0) -> list[dict]:
     with engine.connect() as conn:

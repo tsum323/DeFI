@@ -22,10 +22,23 @@ from sqlalchemy import insert
 from backend.backtesting.dataset import ROOT, load_dataset
 from backend.core.config import load_config
 from backend.database import schema as S
+from backend.strategies.explore import explore_params
 from backend.strategies.generator import DEFAULT_SPACE, SMALL_SPACE, generate
-from backend.strategies.mass_test import _hash, dataset_descriptor, relabel_commit_versions
-from backend.validation.robustness import nested_selection, score_strategies, walk_forward
-from backend.validation.segments import load_segment_table, make_segments, run_segment_table
+from backend.strategies.mass_test import (
+    _hash,
+    dataset_descriptor,
+    relabel_commit_versions,
+)
+from backend.validation.robustness import (
+    nested_selection,
+    score_strategies,
+    walk_forward,
+)
+from backend.validation.segments import (
+    load_segment_table,
+    make_segments,
+    run_segment_table,
+)
 
 
 def _ts(day: str) -> int:
@@ -36,7 +49,8 @@ def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--from", dest="start", default="2021-08-06")
     ap.add_argument("--to", dest="end", default="2026-11-01")
-    ap.add_argument("--space", default="default", choices=["default", "small"])
+    ap.add_argument("--space", default="default", choices=["default", "small", "all"],
+                    help="all = default grid + the second (explore) search")
     ap.add_argument("--segment-days", type=int, default=91)
     ap.add_argument("--oos", type=int, default=7)
     ap.add_argument("--capital", type=float, default=10_000.0)
@@ -48,8 +62,11 @@ def main() -> None:
     t0 = time.monotonic()
     ds = load_dataset(cfg)
     segs = make_segments(ds, _ts(args.start), _ts(args.end), args.segment_days, args.oos)
-    space = DEFAULT_SPACE if args.space == "default" else SMALL_SPACE
+    space = SMALL_SPACE if args.space == "small" else DEFAULT_SPACE
     params = generate(space)
+    if args.space == "all":
+        known = {p.spec_hash for p in params}
+        params += [p for p in explore_params() if p.spec_hash not in known]
     base = dataset_descriptor(ds, cfg.primary_pool, p.address, segs[0].start_block, segs[-1].end_block,
                               int(args.capital * 10 ** ds.decimals1), "gas_units",
                               cfg.lab["costs"]["priority_fee_gwei"])

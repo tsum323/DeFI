@@ -271,9 +271,35 @@ def monitor(payload: dict, snap: MarketSnapshot, cand: Candidate | None, now_ts:
     return "HOLD", "conditions still hold"
 
 
+# ---------------------------------------------------------------- watch level
+# Must pass, or the strategy has no out-of-sample evidence worth watching.
+WATCH_REQUIRED = ("sufficient_history", "oos_beats_passive", "oos_positive_roi")
+
+
+def watch_list(cands: list[Candidate], n: int = 3) -> list[dict]:
+    """Strategies that fail exactly ONE quality filter (and none of WATCH_REQUIRED).
+    Not a signal: they are put on a forward test so that new data can judge them."""
+    out = []
+    for c in cands:
+        failed = [x for x in c.checks if not x.passed]
+        if len(failed) != 1 or failed[0].name in WATCH_REQUIRED:
+            continue
+        out.append({"strategy": c.params.name, "spec_hash": c.params.spec_hash,
+                    "failed": failed[0].name, "value": failed[0].value,
+                    "threshold": failed[0].threshold, "oos_mean_excess": c.stats["mean_excess"],
+                    "oos_mean_roi": c.stats["oos_mean_roi"], "oos_contaminated": c.contaminated})
+        if len(out) == n:
+            break
+    return out
+
+
 # ---------------------------------------------------------------- orchestration
 def contaminated_specs(engine) -> set[str]:
-    out = set()
+    from backend.strategies.explore import explore_params
+    from backend.strategies.generator import DEFAULT_SPACE, generate
+    first = {p.spec_hash for p in generate(DEFAULT_SPACE)}
+    # the second search was designed after seeing OOS results
+    out = {p.spec_hash for p in explore_params()} - first
     with engine.connect() as c:
         for hid, rj in c.execute(select(S.hypotheses.c.id, S.hypotheses.c.result_json)):
             if rj and json.loads(rj).get("oos_contaminated"):
@@ -340,9 +366,10 @@ def evaluate_market(engine, ds: Dataset, state: PoolState, snap: MarketSnapshot,
                             "failed": [x.name for x in c.checks if not x.passed],
                             "oos_mean_excess": c.stats["mean_excess"], "oos_mean_roi": c.stats["oos_mean_roi"]}
                            for c in cands[:5]]
+                watch = watch_list(cands) if all(c.passed for c in pc) else []
                 payload = {"type": "WAIT", "created_at": now_ts, "block": snap.block, **pool_meta,
                            "current_price": snap.price, "reasons": reasons, "closest_candidates": closest,
-                           "label": "SCENARIO"}
+                           "watch": watch, "label": "SCENARIO"}
                 key = json.dumps([r["name"] for r in reasons])
                 same = (sig is not None and sig.signal_type == "WAIT" and status == "WAIT"
                         and ev.reason == key)
@@ -362,7 +389,8 @@ def evaluate_market(engine, ds: Dataset, state: PoolState, snap: MarketSnapshot,
                     signal_id = sig.id
         conn.execute(insert(S.market_evaluations).values(
             created_at=now_ts, block=snap.block, decision=decision,
-            snapshot_json=json.dumps(snap.to_dict()), reasons_json=json.dumps(reasons, default=str)))
+            snapshot_json=json.dumps({**snap.to_dict(), "watch": payload.get("watch", [])}, default=str),
+            reasons_json=json.dumps(reasons, default=str)))
     return Decision(decision, signal_id, snap.to_dict(), reasons, payload)
 
 

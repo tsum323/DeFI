@@ -26,7 +26,12 @@ from backend.signal_engine.market import latest_event_block, snapshot
 from backend.strategies.mass_test import code_version, relabel_commit_versions
 from backend.validation.segments import load_segment_table
 from backend.validation.study import setup_study
-from backend.virtual_portfolio.portfolio import journal, mark_all, open_new_positions
+from backend.virtual_portfolio.portfolio import (
+    journal,
+    mark_all,
+    open_new_positions,
+    register_watch,
+)
 
 TYPE_RU = {"OPEN CANDIDATE": "КАНДИДАТ НА ОТКРЫТИЕ", "WAIT": "ЖДАТЬ", "HOLD": "ДЕРЖАТЬ",
            "REBALANCE": "ПЕРЕСТАВИТЬ ДИАПАЗОН", "CLOSE CANDIDATE": "КАНДИДАТ НА ЗАКРЫТИЕ",
@@ -88,6 +93,14 @@ def main() -> None:
                   f"OOS к пассивному {c['oos_mean_excess']:+.2%}, OOS ROI {c['oos_mean_roi']:+.2%} за отрезок")
     else:
         print("  " + "; ".join(str(x) for x in d.reasons))
+    if d.decision == "WAIT":
+        for w in pl.get("watch", []):
+            print(f"  НАБЛЮДЕНИЕ: {w['strategy']} — не прошла одну проверку: {w['failed']} "
+                  f"({w['value']}, нужно {w['threshold']})")
+        new_watch = register_watch(engine, pl.get("watch", []), load_strategies(engine), snap.block,
+                                   int(sc["capital_usd"] * 10 ** ds.decimals1))
+        for name in new_watch:
+            print(f"  взята на прямой тест (наблюдение): {name}")
     opened = open_new_positions(engine)
     marks = mark_all(engine, ds, lambda b: cached_state_at(ds, b), snap.block,
                      priority_fee_gwei=cfg.lab["costs"]["priority_fee_gwei"])

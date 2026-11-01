@@ -54,6 +54,18 @@ def latest_signal(engine):
             "reason": ev.reason if ev else "", "payload": json.loads(s.payload_json)}
 
 
+def watch_names(engine) -> dict[int, str]:
+    from sqlalchemy import select
+
+    from backend.database import schema as S
+    from backend.strategies.generator import params_from_json
+    from backend.virtual_portfolio.portfolio import WATCH_PREFIX
+    with engine.connect() as c:
+        return {r.id: f"{params_from_json(r.params_json).name}: {r.reason.removeprefix(WATCH_PREFIX)}"
+                for r in c.execute(select(S.forward_tests).where(
+                    S.forward_tests.c.reason.startswith(WATCH_PREFIX)))}
+
+
 def message(sig: dict) -> tuple[str, str]:
     p, st = sig["payload"], sig["status"]
     title = f"Сигнал WBTC/USDC: {TYPE_RU.get(st, st)}"
@@ -96,10 +108,12 @@ def main() -> None:
     run("scripts.data_snapshot", "restore-research")  # idempotent: merges the saved state
     engine = S.make_engine(cfg.lab["database"]["url"])
     before = latest_signal(engine)
+    watch_before = watch_names(engine)
     run("scripts.sync_pool", "--endpoint", "drpc", "--max-minutes", "15", check=False)
     run("scripts.evaluate_market")
     run("scripts.forward_test", check=False)
     after = latest_signal(engine)
+    new_watch = [v for k, v in watch_names(engine).items() if k not in watch_before]
 
     out = ROOT / args.out
     shutil.rmtree(out, ignore_errors=True)
@@ -119,12 +133,18 @@ def main() -> None:
     ds = json.loads((data / "datasources.json").read_text())
     (data / "snapshot.json").write_text(json.dumps({
         "exported_at": int(time.time()), "last_block": ds["last_block"],
-        "last_block_ts": ds["last_block_ts"], "live": True, "every_minutes": 30}))
+        "last_block_ts": ds["last_block_ts"], "live": True, "every_minutes": 15}))
 
     notify = None
     if after and (before is None or (after["id"], after["status"]) != (before["id"], before["status"])):
         title, body = message(after)
         notify = {"title": title, "body": body}
+    elif new_watch:
+        notify = {"title": "WBTC/USDC: новая стратегия в наблюдении",
+                  "body": "\n".join([("Стратегии, которым до сигнала не хватает одной проверки, взяты на "
+                                      "виртуальный тест на новых данных. **Это не сигнал на открытие.**"), ""]
+                                    + [f"- {x}" for x in new_watch]
+                                    + ["", f"Подробности: {SITE_URL} (раздел «Центр сигналов» → «Наблюдение»)."])}
     Path(args.notify_file).write_text(json.dumps(notify) if notify else "")
     print(f"site written to {out} in {time.monotonic() - t0:.0f}s; "
           f"signal {after['type'] if after else None}/{after['status'] if after else None}"

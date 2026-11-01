@@ -1,11 +1,11 @@
-# Live dashboard: every 30 minutes load new blocks, re-evaluate the market (signal,
+# Live dashboard: every 15 minutes load new blocks, re-evaluate the market (signal,
 # virtual portfolio, forward tests) and publish https://tsum323.github.io/DeFI/.
 # A change of the signal opens a GitHub issue (push notification in the GitHub app).
 # Read-only by design: the project has no keys or signing code (tests/test_safety.py).
 name: Live dashboard
 on:
   schedule:
-    - cron: "7,37 * * * *"        # every 30 minutes (off the hour: fewer delays)
+    - cron: "7,22,37,52 * * * *"  # every 15 minutes (off the hour: fewer delays)
   workflow_dispatch:
   push:
     branches: [main]
@@ -70,7 +70,7 @@ jobs:
       - name: Commit history (daily at 00:xx MSK, or on a signal change)
         run: |
           daily=0
-          if [ "$(date -u +%H)" = "21" ] && [ "$(date -u +%-M)" -lt 35 ]; then daily=1; fi
+          if [ "$(date -u +%H)" = "21" ] && [ "$(date -u +%-M)" -lt 20 ]; then daily=1; fi
           if [ "${changed:-0}" = "1" ] || [ "$daily" = "1" ]; then
             [ "$daily" = "1" ] && python -m scripts.report
             git config user.name "github-actions[bot]"

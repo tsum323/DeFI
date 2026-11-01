@@ -187,3 +187,27 @@ def test_live_update_notification_text(tmp_path):
     title, body = message(sig)
     assert "КАНДИДАТ НА ОТКРЫТИЕ" in title
     assert "Диапазон" in body and "МСК" in body and "не инвестиционная рекомендация" in body
+
+
+def test_watch_level_one_failed_check_goes_to_forward_test(tmp_path):
+    # SYNTHETIC: "near" wins everywhere but its drawdown is too deep -> exactly one failed check
+    from backend.api.queries import watch
+    from backend.virtual_portfolio.portfolio import register_watch
+    ds, st, snap, study, engine = setup(tmp_path)
+    bad = StrategyParams(width_pct=0.05, rebalance="on_exit")
+    near = StrategyParams(width_pct=0.3)
+    t = table_with(study, None, bad)
+    for s in study.segments:
+        for var in ("base", "gas_x2"):
+            t[(near.spec_hash, s.index, var)] = metrics(0.02, mdd=0.5)
+    strats = strategies(bad, near)
+    d = evaluate_market(engine, ds, st, snap, t, strats, study, CFG, META, lambda b: state_at(ds, b),
+                        snap.timestamp + 60)
+    assert d.decision == "WAIT"
+    assert [w["strategy"] for w in d.payload["watch"]] == [near.name]
+    assert d.payload["watch"][0]["failed"] == "acceptable_drawdown"
+    assert register_watch(engine, d.payload["watch"], strats, snap.block, 10 ** 6) == [near.name]
+    assert register_watch(engine, d.payload["watch"], strats, snap.block + 1, 10 ** 6) == []  # once
+    w = watch(engine)
+    assert [x["name"] for x in w["tests"]] == [near.name] and w["tests"][0]["on_list_now"]
+    assert [x["strategy"] for x in w["current"]] == [near.name]

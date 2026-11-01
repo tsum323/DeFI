@@ -7,6 +7,7 @@ import Ranking from "./pages/Ranking";
 import Research from "./pages/Research";
 import Signals from "./pages/Signals";
 import { DATA_UPDATED, STATIC, type SnapshotInfo } from "./api";
+import LivePrice from "./components/LivePrice";
 import { Loading } from "./components/ui";
 import { useApi } from "./components/useApi";
 import { date } from "./format";
@@ -21,7 +22,7 @@ function SnapshotBanner() {
   if (!data) return null;
   return <div className="snapshot">Данные блокчейна до блока {data.last_block.toLocaleString("ru-RU")}{" "}
     ({date(data.last_block_ts)}) · обновлено {date(data.exported_at)} ·{" "}
-    {data.live ? `обновляется автоматически каждые ${data.every_minutes ?? 30} минут` : "снимок, обновляется вручную"}.</div>;
+    {data.live ? `обновляется автоматически каждые ${data.every_minutes ?? 15} минут` : "снимок, обновляется вручную"}.</div>;
 }
 
 // Plotly (~4 MB) is only needed on the strategy page: load it on demand
@@ -47,6 +48,7 @@ export default function App() {
       </aside>
       <main className="main">
         {STATIC && <SnapshotBanner />}
+        <LivePrice />
         <Routes>
           <Route path="/" element={<Overview />} />
           <Route path="/ranking" element={<Ranking />} />

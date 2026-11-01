@@ -203,7 +203,24 @@ def signals(engine) -> dict:
                      "payload": json.loads(s.payload_json)})
     active = [r for r in rows if r["type"] == "OPEN CANDIDATE"
               and r["status"] in ("OPEN CANDIDATE", "HOLD", "REBALANCE")]
-    return {"signals": rows, "active": active, "label": "SCENARIO"}
+    return {"signals": rows, "active": active, "watch": watch(engine), "label": "SCENARIO"}
+
+
+def watch(engine) -> dict:
+    """Watch level: strategies one filter short of a signal, followed on new data."""
+    from backend.virtual_portfolio.portfolio import WATCH_PREFIX
+    with engine.connect() as c:
+        ev = c.execute(select(S.market_evaluations).order_by(S.market_evaluations.c.id.desc()).limit(1)).first()
+        fts = c.execute(select(S.forward_tests).where(S.forward_tests.c.reason.startswith(WATCH_PREFIX))
+                        .order_by(S.forward_tests.c.id)).all()
+    current = json.loads(ev.snapshot_json).get("watch", []) if ev else []
+    on_list = {w["spec_hash"] for w in current}
+    tests = [{"id": f.id, "spec_hash": f.spec_hash, "start_block": f.start_block, "created_at": f.created_at,
+              "reason": f.reason.removeprefix(WATCH_PREFIX), "name": params_from_json(f.params_json).name,
+              "on_list_now": f.spec_hash in on_list,
+              "result": json.loads(f.result_json) if f.result_json else None} for f in fts]
+    return {"current": current, "evaluated_at": ev.created_at if ev else None, "tests": tests,
+            "label": "MODELED"}
 
 
 def portfolio(engine) -> dict:
