@@ -174,3 +174,16 @@ def test_virtual_portfolio_from_signal(tmp_path):
     import pytest
     with pytest.raises(RuntimeError):
         mark_all(engine, ds, lambda b: state_at(ds, b), last)
+
+
+def test_live_update_notification_text(tmp_path):
+    from scripts.live_update import latest_signal, message
+    ds, st, snap, study, engine = setup(tmp_path)
+    good, bad = StrategyParams(width_pct=0.3), StrategyParams(width_pct=0.05, rebalance="on_exit")
+    t = table_with(study, good, bad)
+    evaluate_market(engine, ds, st, snap, t, strategies(good, bad), study, CFG, META,
+                    lambda b: state_at(ds, b), snap.timestamp + 60)
+    sig = latest_signal(engine)
+    title, body = message(sig)
+    assert "КАНДИДАТ НА ОТКРЫТИЕ" in title
+    assert "Диапазон" in body and "МСК" in body and "не инвестиционная рекомендация" in body

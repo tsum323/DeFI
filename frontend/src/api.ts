@@ -12,7 +12,9 @@ function staticPath(path: string): string {
 }
 
 export async function getJSON<T>(path: string): Promise<T> {
-  const r = await fetch(STATIC ? staticPath(path) : path);
+  // static site: bypass the CDN/browser cache so a live update is seen immediately
+  const url = STATIC ? `${staticPath(path)}?v=${Date.now()}` : path;
+  const r = await fetch(url, { cache: "no-store" });
   if (!r.ok) throw new Error(`${path}: HTTP ${r.status}`);
   return (await r.json()) as T;
 }
@@ -25,4 +27,6 @@ export interface RankingRow {
   ruined_segments: number; has_details?: boolean;
 }
 export interface Ranking { rows: RankingRow[]; label: Label; per: string; code_version: string }
-export interface SnapshotInfo { exported_at: number; last_block: number; last_block_ts: number }
+export interface SnapshotInfo { exported_at: number; last_block: number; last_block_ts: number;
+  live?: boolean; every_minutes?: number }
+export const DATA_UPDATED = "lab-data-updated";

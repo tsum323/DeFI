@@ -13,3 +13,6 @@ frontend/dist/
 *.db
 *.tsbuildinfo
 frontend/dist-static/
+_site/
+notify.json
+body.md

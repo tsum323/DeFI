@@ -1,0 +1,86 @@
+# Live dashboard: every 30 minutes load new blocks, re-evaluate the market (signal,
+# virtual portfolio, forward tests) and publish https://tsum323.github.io/DeFI/.
+# A change of the signal opens a GitHub issue (push notification in the GitHub app).
+# Read-only by design: the project has no keys or signing code (tests/test_safety.py).
+name: Live dashboard
+on:
+  schedule:
+    - cron: "7,37 * * * *"        # every 30 minutes (off the hour: fewer delays)
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ["site/**", "backend/**", "scripts/**", "config/**", ".github/workflows/live.yml"]
+permissions:
+  contents: write    # daily commit of the signal / portfolio history to data_snapshots/
+  issues: write      # notifications on signal changes
+  pages: write
+  id-token: write
+concurrency:
+  group: live-dashboard
+  cancel-in-progress: false
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - name: Day key
+        id: day
+        run: echo "day=$(date -u +%Y%m%d)" >> "$GITHUB_OUTPUT"
+      # the pool database (~1 GB): saved once a day, restored on every run
+      - uses: actions/cache@v4
+        with:
+          path: |
+            data/lab.sqlite
+            data/replay_cache
+          key: pooldb-v1-${{ steps.day.outputs.day }}
+          restore-keys: pooldb-v1-
+      # the small research state (signals, portfolio, forward tests): saved on every run
+      - uses: actions/cache/restore@v4
+        with:
+          path: data_snapshots/research_db
+          key: state-v1-${{ github.run_id }}
+          restore-keys: state-v1-
+      - name: Update data, signal, portfolio
+        run: python -m scripts.live_update --out _site --notify-file notify.json
+      - name: Save research state
+        run: python -m scripts.data_snapshot export-research
+      - uses: actions/cache/save@v4
+        with:
+          path: data_snapshots/research_db
+          key: state-v1-${{ github.run_id }}
+      - name: Notify on signal change
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [ -s notify.json ]; then
+            title=$(python -c "import json; print(json.load(open('notify.json'))['title'])")
+            python -c "import json; open('body.md','w').write(json.load(open('notify.json'))['body'])"
+            gh issue create --title "$title" --body-file body.md
+            echo "changed=1" >> "$GITHUB_ENV"
+          fi
+      - name: Commit history (daily at 00:xx MSK, or on a signal change)
+        run: |
+          daily=0
+          if [ "$(date -u +%H)" = "21" ] && [ "$(date -u +%-M)" -lt 35 ]; then daily=1; fi
+          if [ "${changed:-0}" = "1" ] || [ "$daily" = "1" ]; then
+            [ "$daily" = "1" ] && python -m scripts.report
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add data_snapshots/research_db data_snapshots/signals data_snapshots/reports
+            git diff --cached --quiet || { git commit -m "Live update: signal and portfolio history" && git pull --rebase && git push; }
+          fi
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+      - id: deployment
+        uses: actions/deploy-pages@v4

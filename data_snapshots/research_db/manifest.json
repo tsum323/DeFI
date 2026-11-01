@@ -11,7 +11,7 @@
   },
   "forward_tests": {
    "rows": 3,
-   "sha256": "53ea2e3c95cf5cf99ce80abcb4426ceec46f2521dca0c440c033bf64f86195df"
+   "sha256": "409c74ab84a7e03dc739800f0129ce9bf9daf932446a6ceab21e3eed2e0676bf"
   },
   "hypotheses": {
    "rows": 5,
@@ -26,8 +26,8 @@
    "sha256": "e04134c1b590548dce6cad510bb8efaa2b04549d8833b0bbf085b2ee7f8af8b3"
   },
   "market_evaluations": {
-   "rows": 4,
-   "sha256": "f4dfff36fa11fbb7dd5dff50a57d7ab8afb64e0e55f1526985bff02d2674dd0a"
+   "rows": 5,
+   "sha256": "26ad086481003741a539adb9b1f7b3a23ad2a11e790a58d9c4f0962ea02b5964"
   },
   "signal_events": {
    "rows": 1,
