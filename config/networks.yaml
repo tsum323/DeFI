@@ -18,7 +18,7 @@ networks:
       - name: drpc
         url: https://eth.drpc.org
         archive: false
-      - name: user_rpc             # user-provided archive node (Alchemy/Infura/QuickNode/own node)
+      - name: alchemy              # user's Alchemy endpoint (archive); domain allowed in env settings
         url_env: ETH_RPC_URL
         archive: true
     indexers:

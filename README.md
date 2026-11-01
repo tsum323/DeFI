@@ -12,6 +12,8 @@
 Этап 1 (исследование и архитектура) завершён — см. [ROADMAP.md](ROADMAP.md).
 
 ## Документация
+- [docs/SPEC.md](docs/SPEC.md) — полное ТЗ заказчика
+- [CLAUDE.md](CLAUDE.md) — правила работы для каждой сессии
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — модули, поток данных, схема БД, безопасность
 - [docs/MATH_CORE.md](docs/MATH_CORE.md) — формулы v3 и воспроизведение комиссий
 - [docs/DATA_SOURCES.md](docs/DATA_SOURCES.md) — источники данных, адреса, доступность
