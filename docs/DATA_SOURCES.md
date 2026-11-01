@@ -98,6 +98,8 @@ python -m scripts.verify_replay_checkpoints  # этап 4: состояние п
 python -m scripts.validate_fee_meter     # этап 4: комиссии против реальных позиций
 python -m scripts.backtest --from 2025-01-01 --to 2026-11-01 --width 0.10 --rebalance on_exit
 python -m scripts.run_grid --from 2025-01-01 --to 2026-11-01   # этап 5: массовый тест сетки стратегий
+python -m scripts.run_validation         # этап 6: IS/OOS, walk-forward, чувствительность, оценка устойчивости
+python -m scripts.run_optuna --trials 120   # этап 6: байесовская оптимизация (только IS), затем OOS
 ```
 
 **Правило выбора основного fee tier:** основным становится пул с большей выручкой LP
