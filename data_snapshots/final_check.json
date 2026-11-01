@@ -1,0 +1,114 @@
+{
+ "tests": {
+  "ok": true,
+  "passed": 96,
+  "failed": 0,
+  "skipped": 0
+ },
+ "math": {
+  "ok": true,
+  "events": 717897,
+  "tick": {
+   "ok": 584319,
+   "ok_boundary_rule": 88
+  },
+  "mint": {
+   "ok": 34529
+  },
+  "burn": {
+   "ok": 28634,
+   "poke": 22357
+  },
+  "swap_step": {
+   "ok": 355540,
+   "exact": 354862
+  }
+ },
+ "checkpoints": {
+  "ok": true,
+  "checkpoints": [
+   15862521,
+   19348964,
+   22835459,
+   26321461
+  ],
+  "checks": 88,
+  "mismatches": 0
+ },
+ "fees": {
+  "ok": true,
+  "compared": 400,
+  "exact": 400,
+  "with_fees": 365
+ },
+ "drawdown": {
+  "ok": true,
+  "rows": [
+   {
+    "strategy": "w0.1_on_exit",
+    "mdd_engine": 0.08124276320443777,
+    "mdd_independent": 0.08124276320443777,
+    "identity_holds": true,
+    "vs_hodl_identity": true
+   },
+   {
+    "strategy": "w0.3_none",
+    "mdd_engine": 0.015455959659947654,
+    "mdd_independent": 0.015455959659947654,
+    "identity_holds": true,
+    "vs_hodl_identity": true
+   }
+  ],
+  "blocks": [
+   25676098,
+   26321461
+  ]
+ },
+ "validation": {
+  "ok": true,
+  "segments": 21,
+  "oos": 7,
+  "strategies": 271,
+  "wf_chosen_sum": 0.1751872555,
+  "wf_passive_sum": 0.5644681787,
+  "wf_beats_passive": 0.42105263157894735,
+  "nested_picked_oos": -0.016618772514285715,
+  "nested_passive_oos": -0.013323254485714286
+ },
+ "lookahead": {
+  "ok": true,
+  "rows": [
+   {
+    "rule": "on_exit",
+    "actions_before_cut": 5,
+    "identical_actions": true,
+    "identical_marks": true
+   },
+   {
+    "rule": "edge",
+    "actions_before_cut": 6,
+    "identical_actions": true,
+    "identical_marks": true
+   },
+   {
+    "rule": "periodic",
+    "actions_before_cut": 16,
+    "identical_actions": true,
+    "identical_marks": true
+   }
+  ],
+  "blocks": [
+   25676098,
+   25998104,
+   26321461
+  ]
+ },
+ "security": {
+  "ok": true,
+  "passed": 18,
+  "failed": 0,
+  "skipped": 0
+ },
+ "code_version": "sim-eee1215dc3cb",
+ "seconds": 128
+}

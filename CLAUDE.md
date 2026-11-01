@@ -36,6 +36,6 @@
   `python -m scripts.data_snapshot restore` (данные пула) и
   `python -m scripts.data_snapshot restore-research` (эксперименты, отчёты, гипотезы, сигналы,
   виртуальные позиции, прямые тесты, Optuna), затем `python -m scripts.evaluate_market --sync`
-  и `python -m scripts.forward_test`. В конце сессии: `python -m scripts.data_snapshot export-research`
+  и `python -m scripts.forward_test` (или весь цикл: `python -m scripts.scheduler once`). В конце сессии: `python -m scripts.data_snapshot export-research`
   и коммит `data_snapshots/research_db/`. Лимит Alchemy ограничен — для загрузки использовать dRPC.
 - Ключ Claude API для AI Researcher (этап 7): `ANTHROPIC_API_KEY` (может быть ещё не задан).

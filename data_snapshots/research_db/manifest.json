@@ -6,12 +6,12 @@
    "sha256": "a7cc089d5e8b3cc2afefae0b89b9caede01b1954764851d2f8ee956694714c4e"
   },
   "experiments": {
-   "rows": 16675,
-   "sha256": "6de5f31df5fa89baf29a097acd3a60ab6e44bf3dce940a0ee261125ba7222f31"
+   "rows": 18495,
+   "sha256": "0913321135ed3c28905c394e8b7db0a8077ae610fcc91cbdb4653296f471d372"
   },
   "forward_tests": {
    "rows": 3,
-   "sha256": "22fe10e4d2c7ac19b7024477a25e1da519af811b20a3cc4b1c3542074990fb6e"
+   "sha256": "53ea2e3c95cf5cf99ce80abcb4426ceec46f2521dca0c440c033bf64f86195df"
   },
   "hypotheses": {
    "rows": 5,
@@ -21,9 +21,13 @@
    "rows": 10,
    "sha256": "e7e1cf7b134d306230249e5d508b395eacdf1a8a5092098a9eda21a87a03032c"
   },
+  "job_runs": {
+   "rows": 9,
+   "sha256": "e04134c1b590548dce6cad510bb8efaa2b04549d8833b0bbf085b2ee7f8af8b3"
+  },
   "market_evaluations": {
-   "rows": 3,
-   "sha256": "4d5d6d2f1f33c66a0e6f03b65c4e26731ef2ce6d1b0481816258f124d8d91ecd"
+   "rows": 4,
+   "sha256": "f4dfff36fa11fbb7dd5dff50a57d7ab8afb64e0e55f1526985bff02d2674dd0a"
   },
   "signal_events": {
    "rows": 1,
@@ -34,12 +38,12 @@
    "sha256": "53eff5ae5f6fbccd0c96de1ed7b705cc6661259ceac391ceaf8f8dc4155c5014"
   },
   "strategies": {
-   "rows": 789,
-   "sha256": "a66288e59c82c0da9e99039f6a007d2ebb4e659a5ff0f6c2f2bab87333532306"
+   "rows": 909,
+   "sha256": "59cf2e6ca1f4df2a2bf4f7c2990c9158f4174ad9294c74a67fc0afeb3d7d5178"
   },
   "validation_reports": {
    "rows": 565,
-   "sha256": "05071f90d608736ff43c00df55aa170a1dd4b0f3efc6bac47e05ec097059cc8d"
+   "sha256": "0e9b4826df53c136a27d41ae79a698c0f3eedfe693ae9f66ff9d149b54680734"
   },
   "virtual_positions": {
    "rows": 0,

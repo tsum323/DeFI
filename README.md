@@ -9,8 +9,10 @@
 > (`backend/core/safety.py`, `tests/test_safety.py`).
 
 ## Статус
-Этап 1 завершён. Этап 2 (Data Engine): код и тесты готовы, реальная загрузка ждёт
-рабочего ключа RPC — см. [ROADMAP.md](ROADMAP.md).
+Все 11 этапов ТЗ выполнены; итоговая проверка — [docs/FINAL_REPORT.md](docs/FINAL_REPORT.md),
+ход работ и ограничения — [ROADMAP.md](ROADMAP.md). Итог исследования (модельные оценки):
+устойчивого преимущества активных стратегий над пассивной широкой позицией после всех расходов
+не найдено; система выдаёт WAIT, кандидаты проходят прямое тестирование на новых данных.
 
 ## Документация
 - [docs/SPEC.md](docs/SPEC.md) — полное ТЗ заказчика
@@ -23,19 +25,22 @@
 ## Быстрый старт
 ```bash
 pip install -r requirements.txt
-python -m pytest                         # тесты конфигурации и безопасности
-python -m scripts.check_data_sources     # проверка доступности RPC
-python -m scripts.verify_pools           # подтверждение пулов on-chain
-python -m scripts.compare_fee_tiers      # выбор основного fee tier
-python -m scripts.sync_pool              # загрузка истории событий пула
+python -m scripts.data_snapshot restore            # данные пула из архива (~2 мин)
+python -m scripts.data_snapshot restore-research   # эксперименты, сигналы, портфель, Optuna
+python -m scripts.evaluate_market --sync           # свежие блоки → анализ рынка → сигнал
+python -m scripts.forward_test                     # прямые тесты кандидатов
+python -m scripts.final_check                      # финальная проверка → docs/FINAL_REPORT.md
+(cd frontend && npm ci && npm run build) && python -m scripts.dashboard   # панель :8000
+python -m scripts.scheduler run                    # автоматический режим (SPEC §16)
 ```
-Для реальных данных: `export ETH_RPC_URL=<archive RPC URL>`.
+Источники данных: бесплатный dRPC по умолчанию для загрузки; `ETH_RPC_URL` (Alchemy) — опционально.
+Ключ `ANTHROPIC_API_KEY` нужен только для автономного AI-исследователя.
 
 ## Структура
 ```
-backend/   core, data_engine, backtesting, strategies, optimizer, validation,
-           analytics, ai_researcher, signal_engine, virtual_portfolio, database, api
-frontend/  React + TypeScript (этап 10)
+backend/   core, data_engine, backtesting, strategies, optimizer, validation, analytics,
+           ai_researcher, signal_engine, virtual_portfolio, automation, database, api
+frontend/  React + TypeScript + Plotly (панель)
 config/    networks.yaml, pools.yaml, lab.yaml
 docs/  tests/  scripts/  data/  experiments/
 ```

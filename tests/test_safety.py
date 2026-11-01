@@ -65,3 +65,34 @@ def test_source_tree_has_no_signing_code():
             if re.search(pat, text):
                 offenders.append(f"{path.relative_to(ROOT)}: {pat}")
     assert not offenders, offenders
+
+
+FRONTEND_BANNED = [r"window\.ethereum", r"eth_sendTransaction", r"eth_signTypedData", r"personal_sign",
+                   r"eth_requestAccounts", r"wallet_"]
+
+
+def test_frontend_has_no_wallet_or_signing_code():
+    src = ROOT / "frontend" / "src"
+    offenders = [f"{p.relative_to(ROOT)}: {pat}" for p in src.rglob("*.ts*")
+                 for pat in FRONTEND_BANNED if re.search(pat, p.read_text(encoding="utf-8"))]
+    assert not offenders, offenders
+
+
+SECRET_PATTERNS = [r"sk-ant-[A-Za-z0-9_-]{20,}", r"alchemy\.com/v2/[A-Za-z0-9_-]{16,}",
+                   r"-----BEGIN [A-Z ]*PRIVATE KEY-----", r"\b0x[0-9a-fA-F]{64}\b(?=.*private)"]
+
+
+def test_no_secrets_in_tracked_files():
+    import subprocess
+    files = subprocess.check_output(["git", "ls-files"], cwd=ROOT, text=True).split()
+    offenders = []
+    for f in files:
+        p = ROOT / f
+        if p.suffix in {".xz", ".png", ".sqlite", ".pkl"} or not p.is_file():
+            continue
+        try:
+            text = p.read_text(encoding="utf-8")
+        except UnicodeDecodeError:
+            continue
+        offenders += [f"{f}: {pat}" for pat in SECRET_PATTERNS if re.search(pat, text)]
+    assert not offenders, offenders

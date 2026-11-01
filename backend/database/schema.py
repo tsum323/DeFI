@@ -265,6 +265,27 @@ forward_tests = Table(  # candidates watched on data that did not exist when the
 )
 
 
+# ------------------------------------------------------------ scheduler (SPEC 16)
+job_runs = Table(
+    "job_runs", metadata,
+    Column("id", Integer, primary_key=True, autoincrement=True),
+    Column("job", String(64), nullable=False, index=True),
+    Column("trigger", String(16), nullable=False),     # schedule | manual
+    Column("started_at", BigInteger, nullable=False),
+    Column("finished_at", BigInteger),
+    Column("status", String(16), nullable=False),      # running | ok | failed | skipped
+    Column("exit_code", Integer),
+    Column("log", Text),                               # tail of stdout/stderr
+)
+
+scheduler_state = Table(
+    "scheduler_state", metadata,
+    Column("key", String(32), primary_key=True),       # paused | heavy_lock
+    Column("value", Text, nullable=False),
+    Column("updated_at", BigInteger, nullable=False),
+)
+
+
 def big_int_columns(spec: EventSpec) -> set[str]:
     t = event_tables.get(spec.table, pool_created_table)
     return {n for n, typ, _ in spec.fields
@@ -297,4 +318,5 @@ __all__ = ["metadata", "pools", "blocks", "raw_logs", "sync_state", "sync_gaps",
            "event_tables", "pool_created_table", "strategies", "datasets", "experiments",
            "validation_reports", "hypotheses", "hypothesis_experiments", "signals", "signal_events",
            "market_evaluations", "virtual_positions", "virtual_marks",
-           "virtual_results", "forward_tests", "make_engine"]
+           "virtual_results", "forward_tests", "job_runs", "scheduler_state",
+           "make_engine"]

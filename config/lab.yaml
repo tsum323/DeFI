@@ -47,4 +47,17 @@ signal_engine:
   price_scenarios: [-0.20, -0.10, -0.05, 0.0, 0.05, 0.10, 0.20]
 
 scheduler:
-  max_parallel_heavy_jobs: 1
+  max_parallel_heavy_jobs: 1        # heavy jobs never run concurrently (lock in the DB)
+  tick_seconds: 60
+  # SPEC 16 cycle: load data -> check -> market analysis -> strategies -> experiments ->
+  # optimization -> ranking -> hypotheses -> signals -> virtual positions -> save -> report
+  jobs:
+    sync:            {every_minutes: 15,    heavy: false, cmd: ["scripts.sync_pool", "--endpoint", "drpc", "--max-minutes", "10"]}
+    check_sources:   {every_minutes: 360,   heavy: false, cmd: ["scripts.check_data_sources"]}
+    evaluate_market: {every_minutes: 60,    heavy: false, cmd: ["scripts.evaluate_market"], after: ["sync"]}
+    forward_tests:   {every_minutes: 60,    heavy: false, cmd: ["scripts.forward_test"], after: ["sync"]}
+    validation:      {every_minutes: 10080, heavy: true,  cmd: ["scripts.run_validation"]}
+    optimization:    {every_minutes: 10080, heavy: true,  cmd: ["scripts.run_optuna", "--trials", "240"]}
+    research:        {every_minutes: 1440,  heavy: true,  cmd: ["scripts.run_research"], needs_env: ANTHROPIC_API_KEY}
+    report:          {every_minutes: 1440,  heavy: false, cmd: ["scripts.report"]}
+    save_snapshot:   {every_minutes: 1440,  heavy: false, cmd: ["scripts.data_snapshot", "export-research"]}

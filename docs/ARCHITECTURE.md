@@ -44,7 +44,7 @@
 | `signal_engine` | актуальное состояние пула → режим → выбор валидированной стратегии → диапазон/соотношение → сценарная оценка → фильтры → статус | `evaluate_market() -> Signal \| None` |
 | `virtual_portfolio` | виртуальные позиции из OPEN CANDIDATE, ежечасная переоценка на реальных событиях; параметры неизменяемы | `open_from_signal()`, `mark_all()` |
 | `api` | FastAPI: чтение результатов, управление задачами (start/stop/resume) | REST `/experiments`, `/signals`, … |
-| `scheduler` (в `core`) | цикл исследования, журнал задач, лимит тяжёлых задач (`max_parallel_heavy_jobs`) | `job_runs` |
+| `scheduler` (`backend/automation`) | цикл исследования, журнал задач, лимит тяжёлых задач (`max_parallel_heavy_jobs`) | `job_runs` |
 
 ## 2. Уровни достоверности данных (сквозная маркировка)
 
