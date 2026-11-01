@@ -162,3 +162,57 @@ def test_pre_london_start_rejected():
     events, blocks = synthetic_history(n_swaps=10)
     with pytest.raises(SimError):
         simulate(dataset(events, blocks), spec(start_block=12_000_000))
+
+
+def _strip(res):
+    return res.metrics, res.actions, res.timeseries
+
+
+def test_simulate_many_equals_individual_runs_and_start_state():
+    from backend.backtesting.position_sim import simulate_many, state_at
+    events, blocks = synthetic_history(n_swaps=500, drift=0.2, seed=8)
+    ds = dataset(events, blocks)
+    specs = [spec(width_pct=0.02, rebalance="on_exit"), spec(width_pct=0.3),
+             spec(width_pct=0.05, rebalance="periodic", period_seconds=600),
+             spec(width_pct=0.05, rebalance="edge", edge_fraction=0.5, start_block=B0 + 40),
+             spec(full_range=True, width_pct=0)]
+    together = simulate_many(ds, specs)
+    for sp, r in zip(specs, together):
+        assert _strip(r) == _strip(simulate(ds, sp))
+    st = state_at(ds, B0 + 4)
+    from_state = simulate_many(ds, specs, start_state=st)
+    assert [_strip(r) for r in from_state] == [_strip(r) for r in together]
+    with pytest.raises(SimError):
+        simulate_many(ds, specs, start_state=state_at(ds, B0 + 100))
+
+
+def test_periodic_edge_and_cooldown_rules():
+    events, blocks = synthetic_history(n_swaps=600, drift=0.3, seed=3)
+    ds = dataset(events, blocks)
+    per = simulate(ds, spec(width_pct=0.5, rebalance="periodic", period_seconds=1200))
+    opens = [a.timestamp for a in per.actions]
+    assert len(opens) > 2 and all(b - a >= 1200 for a, b in zip(opens, opens[1:]))
+    edge = simulate(ds, spec(width_pct=0.02, rebalance="edge", edge_fraction=0.5))
+    exit_ = simulate(ds, spec(width_pct=0.02, rebalance="on_exit"))
+    assert edge.metrics["rebalances"] >= exit_.metrics["rebalances"] >= 1
+    cool = simulate(ds, spec(width_pct=0.02, rebalance="on_exit", cooldown_seconds=3600))
+    ts = [a.timestamp for a in cool.actions]
+    assert all(b - a >= 3600 for a, b in zip(ts, ts[1:]))
+    assert cool.metrics["rebalances"] <= exit_.metrics["rebalances"]
+
+
+def test_asymmetric_ratio_and_full_range():
+    events, blocks = synthetic_history(n_swaps=50)
+    ds = dataset(events, blocks)
+    for target in (0.2, 0.5, 0.8):
+        r = simulate(ds, spec(width_pct=0.2, ratio_token1=target))
+        assert abs(r.actions[0].ratio_token1_actual - target) < 0.03  # tick rounding
+    lo = simulate(ds, spec(width_pct=0.2, ratio_token1=0.2)).actions[0]
+    hi = simulate(ds, spec(width_pct=0.2, ratio_token1=0.8)).actions[0]
+    assert hi.tick_lower < lo.tick_lower and hi.tick_upper < lo.tick_upper  # range below price
+    full = simulate(ds, spec(full_range=True, width_pct=0)).actions[0]
+    assert (full.tick_lower, full.tick_upper) == (-887220, 887220)
+    with pytest.raises(SimError):
+        simulate(ds, spec(full_range=True, width_pct=0, rebalance="on_exit"))
+    with pytest.raises(SimError):
+        simulate(ds, spec(width_pct=0.1, rebalance="periodic"))

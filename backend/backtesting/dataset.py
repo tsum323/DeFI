@@ -36,3 +36,26 @@ def block_at_or_after(ds: Dataset, timestamp: int) -> int:
     if not cands:
         raise ValueError("timestamp after the last stored block")
     return min(cands)
+
+
+def cached_state_at(ds: Dataset, block: int, cache_dir: Path | None = None):
+    """Pool state at the end of `block`, cached on disk (data/replay_cache/).
+    The cache key includes the number and last key of the events up to `block`,
+    so a re-synced or extended history never reuses a stale state."""
+    import hashlib
+    import pickle
+
+    from backend.backtesting.position_sim import state_at
+    cache_dir = cache_dir or ROOT / "data" / "replay_cache"
+    upto = [e for e in ds.events if e.block <= block]
+    tag = hashlib.sha256(repr((len(upto), (upto[-1].block, upto[-1].log_index) if upto else None,
+                               ds.fee, ds.tick_spacing)).encode()).hexdigest()[:16]
+    path = cache_dir / f"state_{block}_{tag}.pkl"
+    if path.exists():
+        return pickle.loads(path.read_bytes())
+    st = state_at(ds, block)
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(".tmp")
+    tmp.write_bytes(pickle.dumps(st, protocol=pickle.HIGHEST_PROTOCOL))
+    tmp.replace(path)
+    return st

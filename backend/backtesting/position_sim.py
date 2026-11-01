@@ -21,13 +21,14 @@ Labels: prices/state EXACT; fees, costs, PnL MODELED.
 from __future__ import annotations
 
 import bisect
+import copy
 import math
 from dataclasses import asdict, dataclass, field
 
 from backend.backtesting import uniswap_math as um
 from backend.backtesting.events import PoolEvent
 from backend.backtesting.fee_meter import FeeMeter
-from backend.backtesting.pool_replay import PoolReplay
+from backend.backtesting.pool_replay import PoolReplay, PoolState
 
 LONDON_BLOCK = 12_965_000
 GWEI = 10 ** 9
@@ -42,12 +43,35 @@ class BacktestSpec:
     start_block: int
     end_block: int
     capital_token1: int                  # starting capital in token1 raw units (USDC: 1e6 = $1)
-    width_pct: float                     # half-width of the range around the price, e.g. 0.05 = +-5%
-    rebalance: str = "none"              # "none" | "on_exit"
-    rebalance_delay_blocks: int = 0      # out of range for at least this many blocks before acting
+    width_pct: float                     # half-width: range = price/(1+w) .. price*(1+w)
+    rebalance: str = "none"              # "none" | "on_exit" | "periodic" | "edge"
+    rebalance_delay_blocks: int = 0      # trigger must persist this many blocks (on_exit, edge)
+    period_seconds: int = 0              # periodic: re-center every period
+    edge_fraction: float = 1.0           # edge: act when the price has moved this fraction of
+                                         # the way from the open tick to the boundary
+    cooldown_seconds: int = 0            # minimum time between two rebalances (all rules)
+    ratio_token1: float | None = None    # target value share of token1 at open (None: symmetric)
+    full_range: bool = False             # passive full-range benchmark (ignores width/ratio)
     gas_set: str = "gas_units"           # "gas_units" (median) | "gas_units_p90"
     priority_fee_gwei: float = 1.0
     mark_every_seconds: int = 86_400     # time-series resolution
+
+    def validate(self) -> None:
+        if self.rebalance not in RULES:
+            raise SimError(f"unknown rebalance rule {self.rebalance!r}")
+        if self.rebalance == "periodic" and self.period_seconds <= 0:
+            raise SimError("periodic rebalance needs period_seconds > 0")
+        if not 0 < self.edge_fraction <= 1:
+            raise SimError("edge_fraction must be in (0, 1]")
+        if self.ratio_token1 is not None and not 0 < self.ratio_token1 < 1:
+            raise SimError("ratio_token1 must be in (0, 1)")
+        if self.width_pct <= 0 and not self.full_range:
+            raise SimError("width_pct must be > 0")
+        if self.full_range and self.rebalance != "none":
+            raise SimError("a full-range position never leaves its range")
+
+
+RULES = ("none", "on_exit", "periodic", "edge")
 
 
 @dataclass
@@ -75,6 +99,7 @@ class Action:
     swap_cost_token1: int     # value lost in the swap vs mid price (fee + impact)
     gas_units: int
     gas_cost_token1: int
+    ratio_token1_actual: float = 0.0  # value share of token1 actually deposited (after rounding)
     il_realized_token1: int = 0
 
 
@@ -94,14 +119,15 @@ def _value1(amount0: int, amount1: int, sqrt_price: int) -> int:
 
 
 class _Sim:
-    def __init__(self, ds: Dataset, spec: BacktestSpec):
+    def __init__(self, ds: Dataset, spec: BacktestSpec, replay: PoolReplay):
         if spec.start_block < LONDON_BLOCK:
             raise SimError("backtests before the London fork need a gas price assumption "
                            "(no baseFeePerGas); start at or after block 12965000")
-        if spec.rebalance not in ("none", "on_exit"):
-            raise SimError(f"unknown rebalance rule {spec.rebalance!r}")
+        spec.validate()
         self.ds, self.spec = ds, spec
-        self.replay = PoolReplay(ds.fee, ds.tick_spacing)
+        self.replay = replay
+        self.last_open_ts = 0
+        self.open_tick = 0
         self.gas = ds.gas_units[spec.gas_set]
         self.eth_blocks = [r[0] for r in ds.eth_usd]
         self.started = False
@@ -114,7 +140,7 @@ class _Sim:
         self.gas_cost = self.swap_cost = self.il_realized = 0
         self.actions: list[Action] = []
         self.series: list[dict] = []
-        self.out_since: int | None = None
+        self.trigger_since: int | None = None
         self.blocks_in_range = self.blocks_total = 0
         self.max_share = 0.0
         self.next_mark = 0
@@ -135,12 +161,42 @@ class _Sim:
 
     def _range(self, tick: int) -> tuple[int, int]:
         sp = self.ds.tick_spacing
-        half = max(1, round(math.log(1 + self.spec.width_pct) / math.log(1.0001)))
-        lower = math.floor((tick - half) / sp) * sp
-        upper = math.ceil((tick + half) / sp) * sp
+        tmin, tmax = -(um.MAX_TICK // sp) * sp, (um.MAX_TICK // sp) * sp
+        if self.spec.full_range:
+            return tmin, tmax
+        if self.spec.ratio_token1 is None:
+            half = max(1, round(math.log(1 + self.spec.width_pct) / math.log(1.0001)))
+            lo_t, hi_t = tick - half, tick + half
+        else:
+            lo_t, hi_t = self._asymmetric_ticks()
+        lower = math.floor(lo_t / sp) * sp
+        upper = math.ceil(hi_t / sp) * sp
         if upper <= lower:
             upper = lower + sp
-        return max(lower, -887220), min(upper, 887220)
+        return max(lower, tmin), min(upper, tmax)
+
+    def _asymmetric_ticks(self) -> tuple[float, float]:
+        """MATH_CORE §2: range with sqrt-width (1+w) whose token1 value share at the
+        current price equals ratio_token1: w1 = (s-sa) / ((s-sa) + (sb-s)*s/sb).
+        Float bisection is fine here: the result is rounded to tickSpacing and the
+        actual deposited ratio is recorded."""
+        s = self.replay.s.sqrt_price / 2 ** 96
+        k = 1 + self.spec.width_pct
+        target = self.spec.ratio_token1
+
+        def w1(sa: float) -> float:
+            sb = sa * k
+            return (s - sa) / ((s - sa) + (sb - s) * s / sb)
+        lo, hi = s / k, s  # w1(lo) = 1, w1(hi) = 0 (decreasing)
+        for _ in range(200):
+            mid = (lo + hi) / 2
+            if w1(mid) > target:
+                lo = mid
+            else:
+                hi = mid
+        sa = (lo + hi) / 2
+        # tick = log_1.0001(price) = 2 * ln(sqrtPrice) / ln(1.0001)
+        return 2 * math.log(sa) / math.log(1.0001), 2 * math.log(sa * k) / math.log(1.0001)
 
     def _swap_to_ratio(self, lower: int, upper: int) -> tuple[int, int]:
         """Dry-run swap through the real pool so that idle tokens match the range ratio.
@@ -202,8 +258,12 @@ class _Sim:
         gas_cost = self._gas_cost_token1(block, gas_units)
         self.gas_cost += gas_cost
         self.swap_cost += swap_cost
-        self.actions.append(Action(block, self.ds.blocks[block][0], kind, s.tick, lower, upper, liq,
-                                   swap_in, swap_cost, gas_units, gas_cost))
+        deposit_value = _value1(a0, a1, s.sqrt_price)
+        ratio = a1 / deposit_value if deposit_value else 0.0
+        ts = self.ds.blocks[block][0]
+        self.last_open_ts, self.open_tick = ts, s.tick
+        self.actions.append(Action(block, ts, kind, s.tick, lower, upper, liq,
+                                   swap_in, swap_cost, gas_units, gas_cost, ratio))
 
     def _close(self) -> int:
         """Burn + collect the current position into idle tokens; returns realized IL."""
@@ -276,23 +336,45 @@ class _Sim:
             if self.pos and self.pos.tick_lower <= self.prev_tick < self.pos.tick_upper:
                 self.blocks_in_range += span
         self.last_block, self.prev_tick = block, s.tick
-        in_range = self.pos.tick_lower <= s.tick < self.pos.tick_upper
-        if in_range:
-            self.out_since = None
-        elif self.out_since is None:
-            self.out_since = block
-        if (spec.rebalance == "on_exit" and not in_range
-                and block - self.out_since >= spec.rebalance_delay_blocks):
+        if spec.rebalance != "none" and self._should_rebalance(block, ts):
             il = self._close()
             self.il_realized += il
             self._open(block, "rebalance", self.gas["decrease_liquidity_and_collect"]
                        + self.gas["mint_new_position"])
             self.actions[-1].il_realized_token1 = il
-            self.out_since = None
+            self.trigger_since = None
         if ts >= self.next_mark:
             self.series.append(self._mark(block, ts))
             while self.next_mark <= ts:
                 self.next_mark += spec.mark_every_seconds
+
+    def detach(self) -> None:
+        if self.pos is not None:
+            for lst, cb in ((self.replay.swap_listeners, self.pos.on_swap),
+                            (self.replay.flash_listeners, self.pos.on_flash)):
+                if cb in lst:
+                    lst.remove(cb)
+            self.pos = None
+
+    def _should_rebalance(self, block: int, ts: int) -> bool:
+        spec, tick, m = self.spec, self.replay.s.tick, self.pos
+        if ts - self.last_open_ts < spec.cooldown_seconds:
+            return False
+        if spec.rebalance == "periodic":
+            return ts - self.last_open_ts >= spec.period_seconds
+        if spec.rebalance == "on_exit":
+            triggered = not (m.tick_lower <= tick < m.tick_upper)
+        else:  # edge: moved edge_fraction of the way from the open tick to a boundary
+            if tick >= self.open_tick:
+                triggered = tick - self.open_tick >= spec.edge_fraction * (m.tick_upper - self.open_tick)
+            else:
+                triggered = self.open_tick - tick >= spec.edge_fraction * (self.open_tick - m.tick_lower)
+        if not triggered:
+            self.trigger_since = None
+            return False
+        if self.trigger_since is None:
+            self.trigger_since = block
+        return block - self.trigger_since >= spec.rebalance_delay_blocks
 
     def result(self) -> PositionResult:
         if not self.started:
@@ -328,7 +410,54 @@ class _Sim:
         return PositionResult(asdict(self.spec), metrics, self.actions, self.series)
 
 
-def simulate(ds: Dataset, spec: BacktestSpec) -> PositionResult:
-    sim = _Sim(ds, spec)
-    sim.replay.run(ds.events, until_block=spec.end_block, on_block_end=sim.on_block_end)
-    return sim.result()
+def simulate_many(ds: Dataset, specs: list[BacktestSpec], *,
+                  start_state: PoolState | None = None,
+                  return_exceptions: bool = False) -> list:
+    """Run many strategies during ONE replay pass. Hypothetical positions never
+    change the real path, so they can share the pool state: each strategy only
+    adds its FeeMeter listener and dry-run swaps. `start_state` (state at the end
+    of some block before every start) skips replaying the earlier history."""
+    replay = PoolReplay(ds.fee, ds.tick_spacing)
+    if start_state is not None:
+        if start_state.block >= min(sp.start_block for sp in specs):
+            raise SimError("start_state is not before every strategy start")
+        replay.s = copy.deepcopy(start_state)
+    sims = [_Sim(ds, sp, replay) for sp in specs]
+    errors: dict[int, Exception] = {}
+    end = max(sp.end_block for sp in specs)
+    after = replay.s.block
+    first = bisect.bisect_right([e.block for e in ds.events], after) if start_state else 0
+
+    def on_block_end(block: int) -> None:
+        for i, sim in enumerate(sims):
+            if i in errors:
+                continue
+            try:
+                sim.on_block_end(block)
+            except (SimError, um.MathError) as exc:  # isolate one strategy's failure
+                errors[i] = exc
+                sim.detach()
+    replay.run(ds.events[first:], until_block=end, on_block_end=on_block_end)
+    out: list = []
+    for i, sim in enumerate(sims):
+        if i not in errors:
+            try:
+                out.append(sim.result())
+                continue
+            except SimError as exc:
+                errors[i] = exc
+        if not return_exceptions:
+            raise errors[i]
+        out.append(errors[i])
+    return out
+
+
+def simulate(ds: Dataset, spec: BacktestSpec, *, start_state: PoolState | None = None) -> PositionResult:
+    return simulate_many(ds, [spec], start_state=start_state)[0]
+
+
+def state_at(ds: Dataset, block: int) -> PoolState:
+    """Pool state at the end of `block` (replays the history up to it)."""
+    replay = PoolReplay(ds.fee, ds.tick_spacing)
+    replay.run(ds.events, until_block=block)
+    return replay.s

@@ -103,6 +103,40 @@ event_tables: dict[str, Table] = {e.table: _event_table(e) for e in POOL_EVENTS}
 pool_created_table = _event_table(POOL_CREATED)
 
 
+# ---------------------------------------------------------------- research
+strategies = Table(
+    "strategies", metadata,
+    Column("spec_hash", String(64), primary_key=True),
+    Column("name", String(128), nullable=False),
+    Column("params_json", Text, nullable=False),
+)
+
+datasets = Table(
+    "datasets", metadata,
+    Column("dataset_hash", String(64), primary_key=True),
+    Column("pool", String(64), nullable=False),
+    Column("from_block", BigInteger, nullable=False),
+    Column("to_block", BigInteger, nullable=False),
+    Column("description_json", Text, nullable=False),  # what the hash covers
+)
+
+experiments = Table(
+    "experiments", metadata,
+    Column("id", Integer, primary_key=True, autoincrement=True),
+    Column("dedup_key", String(64), nullable=False, unique=True),  # spec + dataset + code
+    Column("spec_hash", String(64), nullable=False, index=True),
+    Column("dataset_hash", String(64), nullable=False, index=True),
+    Column("code_version", String(64), nullable=False),
+    Column("status", String(16), nullable=False),  # done | failed | rejected
+    Column("rejection_reason", Text),
+    Column("metrics_json", Text),
+    Column("actions_json", Text),
+    Column("label", String(16), nullable=False, default="MODELED"),
+    Column("started_at", BigInteger, nullable=False),
+    Column("finished_at", BigInteger),
+)
+
+
 def big_int_columns(spec: EventSpec) -> set[str]:
     t = event_tables.get(spec.table, pool_created_table)
     return {n for n, typ, _ in spec.fields
@@ -132,4 +166,5 @@ def make_engine(url: str) -> Engine:
 
 
 __all__ = ["metadata", "pools", "blocks", "raw_logs", "sync_state", "sync_gaps",
-           "event_tables", "pool_created_table", "make_engine"]
+           "event_tables", "pool_created_table", "strategies", "datasets", "experiments",
+           "make_engine"]
