@@ -56,6 +56,10 @@ def decode_log_row(chain_id: int, lg: dict) -> tuple[str, dict] | None:
     return spec.table, row
 
 
+LONDON_BLOCK = 12_965_000  # first block with baseFeePerGas (EIP-1559)
+FEE_HISTORY_MAX = 1024
+
+
 @dataclass
 class SyncStats:
     windows: int = 0
@@ -75,6 +79,10 @@ class PoolSyncer:
     min_chunk_blocks: int = 50
     max_chunk_blocks: int = 100_000
     header_batch: int = 50
+    # "auto": take timestamps from eth_getLogs (blockTimestamp) and base fees
+    # from eth_feeHistory (1024 blocks/call) when the node provides them, and
+    # verify only one header per window; "headers": one header per block.
+    block_meta: str = "auto"
     stats: SyncStats = field(default_factory=SyncStats)
 
     # -- state -----------------------------------------------------------
@@ -111,6 +119,48 @@ class PoolSyncer:
                 out[n] = h
         return out
 
+    def _base_fees(self, lo: int, hi: int) -> dict[int, int]:
+        """Base fee per block for [lo, hi] via eth_feeHistory (cached, 1024/call)."""
+        cache = self.__dict__.setdefault("_fee_cache", {})
+        missing = [n for n in range(max(lo, LONDON_BLOCK), hi + 1) if n not in cache]
+        while missing:
+            start = missing[0]
+            newest = min(start + FEE_HISTORY_MAX - 1, max(hi, self.__dict__.get("_to_block", hi)))
+            res = self.client.call("eth_feeHistory", [hex(newest - start + 1), hex(newest), []])
+            oldest = int(res["oldestBlock"], 16)
+            fees = res["baseFeePerGas"]
+            if oldest != start or len(fees) < newest - start + 1:
+                raise IntegrityError(f"eth_feeHistory returned unexpected range at {start}")
+            for i in range(newest - start + 1):
+                cache[start + i] = int(fees[i], 16)
+            missing = [n for n in missing if n not in cache]
+        for n in [k for k in cache if k < lo]:  # keep the cache small
+            del cache[n]
+        return {n: cache[n] for n in range(max(lo, LONDON_BLOCK), hi + 1)}
+
+    def _meta_from_logs(self, nums: list[int], logs: list[dict]) -> dict[int, dict]:
+        """Header-like dicts built from log fields; one real header per window
+        is still fetched to cross-check blockHash/timestamp."""
+        out: dict[int, dict] = {}
+        for lg in logs:
+            n = int(lg["blockNumber"], 16)
+            h = out.setdefault(n, {"number": lg["blockNumber"], "hash": lg["blockHash"],
+                                   "timestamp": lg["blockTimestamp"]})
+            if h["hash"].lower() != lg["blockHash"].lower() \
+                    or int(h["timestamp"], 16) != int(lg["blockTimestamp"], 16):
+                raise IntegrityError(f"inconsistent block metadata in logs at block {n}")
+        fees = self._base_fees(nums[0], nums[-1])
+        for n, h in out.items():
+            if n in fees:
+                h["baseFeePerGas"] = hex(fees[n])
+        probe = nums[-1]
+        real = self._headers([probe])[probe]
+        if real["hash"].lower() != out[probe]["hash"].lower() \
+                or int(real["timestamp"], 16) != int(out[probe]["timestamp"], 16) \
+                or (real.get("baseFeePerGas") and int(real["baseFeePerGas"], 16) != fees.get(probe)):
+            raise IntegrityError(f"log metadata disagrees with header at block {probe}")
+        return out
+
     def _ingest_window(self, lo: int, hi: int, start_block: int) -> int:
         logs = self.client.get_logs(self.address, lo, hi)
         for lg in logs:
@@ -119,7 +169,10 @@ class PoolSyncer:
             if lg["address"].lower() != self.address.lower():
                 raise IntegrityError("log from unexpected address")
         nums = sorted({int(lg["blockNumber"], 16) for lg in logs})
-        headers = self._headers(nums)
+        if self.block_meta == "auto" and logs and all("blockTimestamp" in lg for lg in logs):
+            headers = self._meta_from_logs(nums, logs)
+        else:
+            headers = self._headers(nums)
         block_rows, raw_rows, decoded = [], [], {}
         for n in nums:
             h = headers[n]
@@ -172,6 +225,7 @@ class PoolSyncer:
         if last is not None and last < start_block - 1:
             raise IntegrityError("existing sync_state starts after requested start_block")
         chunk = self.chunk_blocks
+        self.__dict__["_to_block"] = to_block
         t0 = time.monotonic()
         while cur <= to_block:
             if max_seconds is not None and time.monotonic() - t0 > max_seconds:

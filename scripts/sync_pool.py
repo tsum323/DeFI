@@ -35,6 +35,7 @@ def main() -> None:
     ap.add_argument("--max-blocks", type=int, help="limit this run to N blocks after resume point")
     ap.add_argument("--max-minutes", type=float)
     ap.add_argument("--start-block", type=int, help="override creation block (testing only)")
+    ap.add_argument("--endpoint", help="use this RPC endpoint name from networks.yaml (default: first usable archive)")
     args = ap.parse_args()
 
     p = cfg.pools[args.pool]
@@ -47,7 +48,13 @@ def main() -> None:
     start = args.start_block if args.start_block is not None else ver["created_block"]
 
     # Historical ranges need an archive node; never fall back to a pruned one.
+    eps = {ep["name"]: ep for ep in net.rpc}
+    if args.endpoint:
+        if args.endpoint not in eps:
+            raise SystemExit(f"unknown endpoint {args.endpoint!r}; known: {', '.join(eps)}")
+        net = net.model_copy(update={"rpc": [eps[args.endpoint]]})
     client = select_client(net, de, require_archive=True)
+    window_cap = eps[client.name].get("max_logs_blocks")
     head = client.block_number()
     safe = head - de["confirmations"]
     to_block = min(args.to_block or safe, safe)
@@ -65,8 +72,9 @@ def main() -> None:
                 verified_at_block=ver.get("state_block"), verified_source=client.name))
 
     syncer = PoolSyncer(client, engine, net.chain_id, p.address,
-                        chunk_blocks=de["logs_chunk_blocks"],
-                        min_chunk_blocks=de["min_chunk_blocks"])
+                        chunk_blocks=min(de["logs_chunk_blocks"], window_cap or 10 ** 9),
+                        min_chunk_blocks=min(de["min_chunk_blocks"], window_cap or 10 ** 9),
+                        max_chunk_blocks=window_cap or 100_000)
     resume = (syncer.last_block() or start - 1) + 1
     if args.max_blocks:
         to_block = min(to_block, resume + args.max_blocks - 1)

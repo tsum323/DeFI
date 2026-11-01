@@ -284,3 +284,52 @@ def test_batch_splits_on_persistent_http_429(monkeypatch):
     c = RpcClient("t", "https://example.invalid/rpc", max_retries=0)
     out = c.batch([("eth_blockNumber", [])] * 8)
     assert len(out) == 8 and sizes == [8, 4, 2, 2, 4, 2, 2]
+
+
+class FakeChainLogMeta(FakeChain):
+    """SYNTHETIC: node whose logs carry blockTimestamp and which serves eth_feeHistory."""
+
+    def __init__(self, logs, **kw):
+        super().__init__(logs, **kw)
+        for lg in self.logs:
+            lg["blockTimestamp"] = hex(1_700_000_000 + int(lg["blockNumber"], 16) * 12)
+        self.header_calls = 0
+        self.fee_calls = 0
+
+    def batch(self, calls):
+        self.header_calls += len(calls)
+        return super().batch(calls)
+
+    def call(self, method, params):
+        assert method == "eth_feeHistory"
+        self.fee_calls += 1
+        count, newest = int(params[0], 16), int(params[1], 16)
+        return {"oldestBlock": hex(newest - count + 1),
+                "baseFeePerGas": [hex(10 ** 9)] * (count + 1)}
+
+
+def test_sync_block_meta_from_logs_uses_few_requests(engine, monkeypatch):
+    import backend.data_engine.sync as sync_mod
+    monkeypatch.setattr(sync_mod, "LONDON_BLOCK", 0)
+    chain = FakeChainLogMeta(_logs())
+    s = PoolSyncer(chain, engine, 1, POOL, chunk_blocks=2000, max_chunk_blocks=2000)
+    s.run(100, 2000)
+    assert coverage_report(engine, 1, POOL)["events"]["ev_swap"] == 4
+    assert chain.header_calls == 1 and chain.fee_calls <= 2  # 1 probe header, not 1 per block
+    with engine.connect() as c:
+        rows = c.execute(select(S.blocks.c.number, S.blocks.c.timestamp,
+                                S.blocks.c.base_fee_per_gas)).all()
+    assert {r.number for r in rows} == {100, 250, 999, 1500}
+    assert all(r.timestamp == 1_700_000_000 + r.number * 12 and r.base_fee_per_gas == str(10 ** 9)
+               for r in rows)
+
+
+def test_sync_block_meta_probe_detects_bad_hash(engine, monkeypatch):
+    import backend.data_engine.sync as sync_mod
+    monkeypatch.setattr(sync_mod, "LONDON_BLOCK", 0)
+    chain = FakeChainLogMeta(_logs())
+    chain.bad_hash_block = 1500  # last block of the window is the probe
+    s = PoolSyncer(chain, engine, 1, POOL, chunk_blocks=2000, max_chunk_blocks=2000)
+    with pytest.raises(IntegrityError):
+        s.run(100, 2000)
+    assert coverage_report(engine, 1, POOL)["open_gaps"] == 1

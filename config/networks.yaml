@@ -17,10 +17,11 @@ networks:
         archive: true
       - name: publicnode
         url: https://ethereum-rpc.publicnode.com
-        archive: false             # blocked by session network policy (403)
+        archive: false             # free: only the last ~2-3 days; older -> 403 "personal token"
       - name: drpc
         url: https://eth.drpc.org
-        archive: false             # blocked by session network policy (403)
+        archive: true              # free plan serves old blocks (checked 2026-11-01)
+        max_logs_blocks: 100       # free plan: eth_getLogs windows above ~100 blocks rejected
     indexers:
       thegraph_uniswap_v3:
         kind: subgraph
