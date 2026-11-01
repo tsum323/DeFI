@@ -137,6 +137,19 @@ experiments = Table(
 )
 
 
+validation_reports = Table(
+    "validation_reports", metadata,
+    Column("id", Integer, primary_key=True, autoincrement=True),
+    Column("study_key", String(64), nullable=False, index=True),
+    Column("spec_hash", String(64), nullable=False),
+    Column("code_version", String(64), nullable=False),
+    Column("score", Integer, nullable=False),          # robustness 0..100 (x100 for 2 decimals)
+    Column("components_json", Text, nullable=False),
+    Column("flags_json", Text, nullable=False),
+    Column("created_at", BigInteger, nullable=False),
+)
+
+
 def big_int_columns(spec: EventSpec) -> set[str]:
     t = event_tables.get(spec.table, pool_created_table)
     return {n for n, typ, _ in spec.fields
@@ -167,4 +180,4 @@ def make_engine(url: str) -> Engine:
 
 __all__ = ["metadata", "pools", "blocks", "raw_logs", "sync_state", "sync_gaps",
            "event_tables", "pool_created_table", "strategies", "datasets", "experiments",
-           "make_engine"]
+           "validation_reports", "make_engine"]
