@@ -59,10 +59,24 @@ Factory не подтверждены через RPC (только CREATE2-вы�
 - Распределение ликвидности, tick crossings и fee growth не хранятся отдельно — они строятся
   replay'ем событий в этапах 3–4 (DATA_SOURCES §1).
 
-## Этап 3 — Математическое ядро ⏳ (не зависит от сети — можно начинать параллельно)
-- TickMath, FullMath, SqrtPriceMath, SwapMath, LiquidityAmounts — целочисленно
-- Fee growth (inside/outside), Position.update
-- Тест-векторы v3-core, property-based тесты
+## Этап 3 — Математическое ядро ✅
+- ✅ `backend/backtesting/uniswap_math.py` — перенос 1:1 из v3-core/v3-periphery, только целые
+  числа: FullMath, UnsafeMath, LiquidityMath, TickMath, SqrtPriceMath, SwapMath, Tick
+  (fee growth inside/outside, update, cross), Position.update, LiquidityAmounts, суммы mint/burn
+- ✅ Тесты (`tests/test_uniswap_math.py`): эталонные векторы из тестов v3-core (TickMath,
+  SqrtPriceMath, SwapMath, Tick), сравнение с Decimal высокой точности, свойства округления,
+  синтетические сценарии комиссий позиции (SYNTHETIC), реальные события из фикстур
+- ✅ Сверка с реальной историей (`python -m scripts.validate_math_history` → `math_validation.json`),
+  0 расхождений:
+  - тик: 584 395 / 584 395 swap (88 — правило контракта «остановка на инициализированном тике
+    при движении вниз → tick − 1»);
+  - mint: 34 525 / 34 525 и burn: 28 632 / 28 632 — суммы токенов совпали до 1 wei;
+  - шаг свопа: 355 533 пары подряд идущих swap без смены ликвидности; 354 855 точно,
+    678 — на 1 wei (exact-output свопы: воспроизведение по цене не знает тип свопа)
+
+**Известные ограничения:** реконструкция полного состояния пула (TickBitmap, цикл swap через
+тики, Flash, протокольная комиссия, контрольные точки `eth_call`) — `pool_replay`, этап 4.
+Подбор асимметричного диапазона под целевое соотношение активов (MATH_CORE §2) — этап 5.
 
 ## Этап 4 — Backtesting Engine ⏳
 - `pool_replay` с инвариантами по каждому Swap; snapshots

@@ -19,6 +19,43 @@ from backend.data_engine.abi import POOL_EVENTS
 ROOT = Path(__file__).resolve().parent.parent
 
 
+def _math_cases(db, addr: str, rng: random.Random, n: int) -> dict:
+    """Real Mint/Burn events with the pool price just before them, and pairs of
+    consecutive swaps (same liquidity, nothing in between) for math-core tests."""
+    ev = db.execute(
+        "select r.block_number, r.log_index, r.topic0 from raw_logs r where lower(r.address) = ? "
+        "order by r.block_number, r.log_index", (addr,)).fetchall()
+    topic = {e.name: e.topic0 for e in POOL_EVENTS}
+    q = {"Swap": "select sqrtPriceX96, tick, liquidity, amount0, amount1 from ev_swap",
+         "Mint": "select tickLower, tickUpper, amount, amount0, amount1 from ev_mint",
+         "Burn": "select tickLower, tickUpper, amount, amount0, amount1 from ev_burn"}
+    rows = {k: {(r[0], r[1]): r[2:] for r in db.execute(
+        sql.replace("select ", "select block_number, log_index, ", 1) + " where lower(address) = ?",
+        (addr,))} for k, sql in q.items()}
+    kind_of = {topic[k]: k for k in q}
+    mint_cases, swap_pairs = [], []
+    last_swap, prev = None, None
+    for bn, li, t0 in ev:
+        kind = kind_of.get(t0)
+        if kind is None:
+            continue
+        row = rows[kind][(bn, li)]
+        if kind == "Swap":
+            if prev and prev[0] == "Swap" and prev[1][2] == row[2] and prev[1][0] != row[0]:
+                swap_pairs.append({"block": bn, "log_index": li, "sqrt_before": prev[1][0],
+                                   "sqrt_after": row[0], "liquidity": row[2],
+                                   "amount0": row[3], "amount1": row[4]})
+            last_swap = row
+        elif last_swap is not None and int(row[2]) > 0:
+            mint_cases.append({"event": kind, "block": bn, "log_index": li,
+                               "sqrt_price": last_swap[0], "tick": last_swap[1],
+                               "tick_lower": row[0], "tick_upper": row[1], "liquidity": row[2],
+                               "amount0": row[3], "amount1": row[4]})
+        prev = (kind, row)
+    return {"mint_burn_cases": rng.sample(mint_cases, min(n, len(mint_cases))),
+            "swap_pairs": rng.sample(swap_pairs, min(n, len(swap_pairs)))}
+
+
 def main() -> None:
     cfg = load_config()
     ap = argparse.ArgumentParser()
@@ -46,7 +83,8 @@ def main() -> None:
                         "data": r[5], "blockNumber": hex(bn), "logIndex": hex(li),
                         "blockHash": r[0], "transactionHash": r[1], "transactionIndex": hex(r[2])})
     doc = {"label": "EXACT real on-chain logs (Ethereum mainnet)", "pool": cfg.primary_pool,
-           "address": p.address, "tick_spacing": p.tick_spacing, "logs": out}
+           "address": p.address, "tick_spacing": p.tick_spacing, "fee": p.fee, "logs": out,
+           **_math_cases(db, p.address.lower(), rng, args.per_type * 5)}
     path = ROOT / "tests" / "fixtures" / "real_pool_logs.json"
     path.write_text(json.dumps(doc, indent=1) + "\n")
     print(f"wrote {len(out)} logs -> {path.relative_to(ROOT)}")

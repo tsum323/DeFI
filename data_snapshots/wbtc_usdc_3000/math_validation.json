@@ -1,0 +1,30 @@
+{
+ "pool": "wbtc_usdc_3000",
+ "address": "0x99ac8cA7087fA4A2A1FB6357269965A2014ABc35",
+ "events": 717865,
+ "eps_wei": 2,
+ "results": {
+  "tick": {
+   "ok": 584307,
+   "ok_boundary_rule": 88
+  },
+  "mint": {
+   "ok": 34525
+  },
+  "burn": {
+   "ok": 28632,
+   "poke": 22351
+  },
+  "swap_step": {
+   "ok": 355533,
+   "exact": 354855
+  }
+ },
+ "swap_step_diff_histogram": {
+  "0,0": 354855,
+  "1,0": 675,
+  "1,-1": 3
+ },
+ "failures": [],
+ "seconds": 9.6
+}
