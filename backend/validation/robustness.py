@@ -203,3 +203,30 @@ def walk_forward(table: dict, params: list[StrategyParams], segments: list[Segme
             "chosen_beats_passive": sum(1 for s in steps if s["test_roi"] is not None and
                                         s["passive_roi"] is not None and s["test_roi"] > s["passive_roi"])
             / max(1, len(steps))}
+
+
+def nested_selection(table: dict, params: list[StrategyParams], segments: list[Segment],
+                     space: dict = DEFAULT_SPACE, inner_oos: int = 4, top: int = 10) -> dict:
+    """Selection that never sees the real OOS segments: score on IS only (the last
+    `inner_oos` IS segments play the role of OOS), pick the top strategies, then
+    report their results on the real OOS segments. Ranking by the full score uses
+    the OOS segments and is therefore optimistic; this is the honest estimate."""
+    from dataclasses import replace
+    is_segs = [s for s in segments if s.role == "IS"]
+    real_oos = [s for s in segments if s.role == "OOS"]
+    inner = [replace(s, role="OOS" if k >= len(is_segs) - inner_oos else "IS")
+             for k, s in enumerate(is_segs)]
+    picked = score_strategies(table, params, inner, space)[:top]
+    rows = []
+    for r in picked:
+        rois = [_roi(table.get((r.spec_hash, s.index, "base"))) for s in real_oos]
+        rois = [x for x in rois if x is not None]
+        rows.append({"name": r.name, "inner_score": r.score,
+                     "oos_mean_roi": statistics.fmean(rois) if rois else None,
+                     "oos_positive": sum(x > 0 for x in rois) / len(real_oos) if real_oos else None})
+    passive = [_roi(table.get((PASSIVE, s.index, "base"))) for s in real_oos]
+    passive = [x for x in passive if x is not None]
+    vals = [r["oos_mean_roi"] for r in rows if r["oos_mean_roi"] is not None]
+    return {"inner_oos_segments": inner_oos, "picked": rows,
+            "picked_mean_oos_roi": statistics.fmean(vals) if vals else None,
+            "passive_mean_oos_roi": statistics.fmean(passive) if passive else None}

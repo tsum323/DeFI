@@ -24,7 +24,7 @@ from backend.core.config import load_config
 from backend.database import schema as S
 from backend.strategies.generator import DEFAULT_SPACE, SMALL_SPACE, generate
 from backend.strategies.mass_test import _hash, dataset_descriptor, relabel_commit_versions
-from backend.validation.robustness import score_strategies, walk_forward
+from backend.validation.robustness import nested_selection, score_strategies, walk_forward
 from backend.validation.segments import load_segment_table, make_segments, run_segment_table
 
 
@@ -72,6 +72,7 @@ def main() -> None:
     table = load_segment_table(engine, base, segs, version)
     reports = score_strategies(table, params, segs, space)
     wf = walk_forward(table, params, segs)
+    nested = nested_selection(table, params, segs, space)
     study_key = _hash([base, [asdict(s) for s in segs], sorted(x.spec_hash for x in params), version])
     now = int(time.time())
     with engine.begin() as conn:
@@ -86,7 +87,8 @@ def main() -> None:
     out.write_text(json.dumps({
         "study_key": study_key, "code_version": version, "dataset": base,
         "segments": [asdict(s) for s in segs], "label": "MODELED",
-        "reports": [asdict(r) for r in reports], "walk_forward": wf}, indent=1) + "\n")
+        "reports": [asdict(r) for r in reports], "walk_forward": wf,
+        "nested_selection": nested}, indent=1) + "\n")
 
     def pct(x):
         return "   n/a" if x is None else f"{x:+6.1%}"
@@ -111,6 +113,13 @@ def main() -> None:
           f"{wf['chosen_beats_passive']:.0%}")
     print(f"  passive full range: sum ROI {wf['passive_sum_roi']:+.1%}; "
           f"median strategy: {wf['median_sum_roi']:+.1%}")
+    print(f"\nNESTED SELECTION (chosen on IS only, last {nested['inner_oos_segments']} IS segments "
+          f"as inner OOS; real OOS never seen):")
+    for r in nested["picked"][:5]:
+        print(f"  {r['name']:34s} inner score {r['inner_score']:5.1f}  real OOS mean ROI "
+              f"{pct(r['oos_mean_roi'])}  OOS+ {r['oos_positive'] or 0:4.0%}")
+    print(f"  top-{len(nested['picked'])} mean real OOS ROI {pct(nested['picked_mean_oos_roi'])} vs "
+          f"passive {pct(nested['passive_mean_oos_roi'])} per segment")
     print(f"\nwritten {out.relative_to(ROOT)}  ({time.monotonic() - t0:.0f}s)")
 
 

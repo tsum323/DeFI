@@ -113,3 +113,16 @@ def test_optuna_optimizes_on_is_only_and_resumes(tmp_path):
     assert top and len({p.spec_hash for p in top}) == len(top)
     p = params_from_trial(optuna.trial.FixedTrial(st2.best_trial.params))
     assert p.spec_hash == st2.best_trial.user_attrs["spec_hash"]
+
+
+def test_nested_selection_never_uses_real_oos():
+    from backend.validation.robustness import nested_selection
+    segs = [seg(i, "IS") for i in range(8)] + [seg(i, "OOS") for i in range(8, 11)]
+    a, b = StrategyParams(width_pct=0.3), StrategyParams(width_pct=0.5)
+    passive = StrategyParams(full_range=True, width_pct=0.0)
+    # a is great in IS, terrible in OOS; b is the opposite
+    t = table_for(segs, {a.spec_hash: [0.05] * 8 + [-0.2] * 3, b.spec_hash: [-0.05] * 8 + [0.2] * 3,
+                         passive.spec_hash: [0.0] * 11})
+    res = nested_selection(t, [a, b, passive], segs, top=1)
+    assert res["picked"][0]["name"] == "w0.3_static"          # chosen without OOS
+    assert abs(res["picked_mean_oos_roi"] - (-0.2)) < 1e-9     # honest OOS outcome

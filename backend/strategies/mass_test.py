@@ -32,7 +32,8 @@ RESULT_PATHS = ("backend/backtesting", "backend/strategies/generator.py", "backe
 
 
 def _git(*args: str) -> str:
-    return subprocess.check_output(["git", *args], cwd=ROOT, text=True).strip()
+    return subprocess.check_output(["git", *args], cwd=ROOT, text=True,
+                                   stderr=subprocess.DEVNULL).strip()
 
 
 def code_version(rev: str = "HEAD") -> str:
