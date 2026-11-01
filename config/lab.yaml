@@ -1,0 +1,32 @@
+# Global lab settings.
+
+mode: research_only        # the ONLY supported mode. No trading, no wallets.
+
+database:
+  url: sqlite:///data/lab.sqlite   # PostgreSQL later: postgresql+psycopg://...
+
+data_engine:
+  logs_chunk_blocks: 5000          # initial eth_getLogs window, adaptively halved on errors
+  min_chunk_blocks: 50
+  confirmations: 64                # ~2 epochs: do not ingest unfinalized blocks
+  max_retries: 5
+  retry_backoff_seconds: [2, 4, 8, 16, 32]
+
+costs:
+  # ASSUMPTIONS until calibrated from real NonfungiblePositionManager receipts (stage 2/4).
+  gas_units:
+    mint_new_position: 500000
+    increase_liquidity: 200000
+    decrease_liquidity_and_collect: 250000
+    swap_for_rebalance: 180000
+  gas_price_source: block_base_fee_plus_priority   # historical baseFeePerGas per block
+  priority_fee_gwei: 1.0
+
+ai_researcher:
+  provider: anthropic
+  model: claude-opus-5-5           # swappable via adapter
+  api_key_env: ANTHROPIC_API_KEY
+  max_hypotheses_per_cycle: 5
+
+scheduler:
+  max_parallel_heavy_jobs: 1
