@@ -84,10 +84,12 @@ CREATE2 доказывает, *каким был бы* адрес пула; фа
 ## 5. Конвейер этапа 2 (команды)
 
 ```bash
+python -m scripts.data_snapshot restore  # в новой сессии: поднять базу из data_snapshots/ (~2 мин)
 python -m scripts.check_data_sources     # доступность endpoint'ов
 python -m scripts.verify_pools           # getPool, token0/1, fee, tickSpacing, PoolCreated → data/pool_verification.json
 python -m scripts.compare_fee_tiers      # 30 дней: swaps, объём, комиссии LP, TVL, fee/TVL → data/fee_tier_comparison.json
-python -m scripts.sync_pool              # полная история событий primary_pool в БД (возобновляемо)
+python -m scripts.sync_pool --endpoint drpc   # история событий primary_pool в БД (возобновляемо, бесплатно)
+python -m scripts.data_snapshot export   # сохранить базу в data_snapshots/ для git
 ```
 
 **Правило выбора основного fee tier:** основным становится пул с большей выручкой LP

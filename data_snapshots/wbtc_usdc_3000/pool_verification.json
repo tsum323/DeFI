@@ -1,0 +1,56 @@
+{
+  "head": 26319982,
+  "reference_block": 26319918,
+  "endpoint": "alchemy",
+  "factory_deploy_block_confirmed": true,
+  "pools": {
+    "wbtc_usdc_3000": {
+      "configured_address": "0x99ac8cA7087fA4A2A1FB6357269965A2014ABc35",
+      "fee": 3000,
+      "factory_getPool": "0x99ac8cA7087fA4A2A1FB6357269965A2014ABc35",
+      "address_matches": true,
+      "token0_ok": true,
+      "token1_ok": true,
+      "fee_ok": true,
+      "tick_spacing_ok": true,
+      "tick": 66575,
+      "sqrt_price_x96": "2210382568136190738837780993029",
+      "liquidity": "2465304136652",
+      "fee_protocol": 102,
+      "balance0": "15298045866",
+      "balance1": "10108668232306",
+      "state_block": 26319918,
+      "created_block": 12376048,
+      "created_tx": "0x2acb44ed240131e3a05eacc0ee870bdf93564f299eb633156a60d81055a352eb",
+      "created_method": "PoolCreated",
+      "created_tick_spacing_ok": true,
+      "verified": true
+    },
+    "wbtc_usdc_500": {
+      "configured_address": "0x9a772018FbD77fcD2d25657e5C547BAfF3Fd7D16",
+      "fee": 500,
+      "factory_getPool": "0x9a772018FbD77fcD2d25657e5C547BAfF3Fd7D16",
+      "address_matches": true,
+      "token0_ok": true,
+      "token1_ok": true,
+      "fee_ok": true,
+      "tick_spacing_ok": true,
+      "tick": 66556,
+      "sqrt_price_x96": "2208373556945221673080533485325",
+      "liquidity": "22824793612",
+      "fee_protocol": 68,
+      "balance0": "299049613",
+      "balance1": "94315068090",
+      "state_block": 26319918,
+      "created_block": 12561607,
+      "created_tx": "0xd0cf4b98ecf2c7a69bd1ee7fc3012a508202d9afdf2d9d41f05b49525bb4a853",
+      "created_method": "PoolCreated",
+      "created_tick_spacing_ok": true,
+      "verified": true
+    }
+  },
+  "other_wbtc_usdc_fee_tiers": {
+    "100": "0x026Babd2ae9379525030Fc2574e39bc156C10583",
+    "10000": "0xCBFB0745b8489973Bf7b334d54fdBd573Df7eF3c"
+  }
+}

@@ -1,0 +1,36 @@
+{
+  "window_blocks": [
+    26103919,
+    26319919
+  ],
+  "days": 30.0,
+  "endpoint": "alchemy",
+  "pools": {
+    "wbtc_usdc_3000": {
+      "address": "0x99ac8cA7087fA4A2A1FB6357269965A2014ABc35",
+      "fee": 3000,
+      "swaps": 5702,
+      "volume_usdc": 100955246.655432,
+      "lp_fees_usdc": 302865.739966296,
+      "tvl_usdc": 22015924.073039375,
+      "price_usdc_per_wbtc": 77835.14276942603,
+      "active_liquidity": "2465304136652",
+      "fee_protocol": 102,
+      "fee_apr_on_tvl": 0.16737278393123378
+    },
+    "wbtc_usdc_500": {
+      "address": "0x9a772018FbD77fcD2d25657e5C547BAfF3Fd7D16",
+      "fee": 500,
+      "swaps": 13807,
+      "volume_usdc": 5270613.059646,
+      "lp_fees_usdc": 2635.306529823,
+      "tvl_usdc": 326657.8332929815,
+      "price_usdc_per_wbtc": 77693.71873521918,
+      "active_liquidity": "22824793612",
+      "fee_protocol": 68,
+      "fee_apr_on_tvl": 0.09815437698103228
+    }
+  },
+  "selected": "wbtc_usdc_3000",
+  "close_call": false
+}

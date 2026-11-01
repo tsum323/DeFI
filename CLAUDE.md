@@ -32,4 +32,7 @@
 - Доступ к данным: Alchemy, ключ в переменной окружения `ETH_RPC_URL`. Никогда не выводить
   её значение в чат, логи, коммиты.
 - Проверка доступа: `python -m scripts.check_data_sources`.
+- База не хранится между сессиями: в начале сессии `python -m scripts.data_snapshot restore`
+  (данные из `data_snapshots/`), затем `python -m scripts.sync_pool --endpoint drpc`.
+  Лимит Alchemy ограничен — для массовой загрузки использовать бесплатный dRPC.
 - Ключ Claude API для AI Researcher (этап 7): `ANTHROPIC_API_KEY` (может быть ещё не задан).
