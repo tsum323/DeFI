@@ -211,3 +211,13 @@ def test_watch_level_one_failed_check_goes_to_forward_test(tmp_path):
     w = watch(engine)
     assert [x["name"] for x in w["tests"]] == [near.name] and w["tests"][0]["on_list_now"]
     assert [x["strategy"] for x in w["current"]] == [near.name]
+
+
+def test_data_age_counts_synced_blocks_without_events(tmp_path):
+    # SYNTHETIC: a quiet pool (no event since the last swap) is still current when synced
+    ds, st, snap, study, engine = setup(tmp_path)
+    now = snap.timestamp + 3 * 3600
+    stale = snapshot(ds, st, now, vol_median=1e9)
+    fresh = snapshot(ds, st, now, vol_median=1e9, synced_block=st.block + 3 * 3600 // 12 - 5)
+    assert stale.data_age_seconds == 3 * 3600 and fresh.data_age_seconds == 60
+    assert snapshot(ds, st, now, 1e9, synced_block=st.block + 10 ** 6).data_age_seconds == 0

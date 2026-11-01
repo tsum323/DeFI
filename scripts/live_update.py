@@ -31,6 +31,10 @@ TYPE_RU = {"OPEN CANDIDATE": "КАНДИДАТ НА ОТКРЫТИЕ", "WAIT": "
            "REBALANCE": "ПЕРЕСТАВИТЬ ДИАПАЗОН", "CLOSE CANDIDATE": "КАНДИДАТ НА ЗАКРЫТИЕ",
            "INVALIDATED": "СИГНАЛ ОТМЕНЁН"}
 
+REASON_RU = {"data_current": "данные пула не свежие", "pool_activity": "в пуле мало торгов",
+             "market_data_complete": "не хватает рыночных данных",
+             "no_validated_strategy": "ни одна стратегия не прошла все проверки"}
+
 
 def run(*args: str, check: bool = True) -> int:
     print("$ python -m", " ".join(args), flush=True)
@@ -79,7 +83,11 @@ def message(sig: dict) -> tuple[str, str]:
                   f"${p['expected_fees_usd'][1]:,.2f}; расходы ${p['expected_costs_usd']['total']:,.2f}",
                   f"- Действует до {datetime.fromtimestamp(p['valid_until'], MSK):%d.%m.%Y %H:%M} МСК"]
     else:
-        lines.append(f"Причина: {sig['reason']}")
+        try:
+            why = "; ".join(REASON_RU.get(r, r) for r in json.loads(sig["reason"]))
+        except (ValueError, TypeError):
+            why = sig["reason"]
+        lines.append(f"Причина: {why}")
     lines += ["", f"Подробности: {SITE_URL} (раздел «Центр сигналов»).", "",
               "_Исследовательский сигнал, не инвестиционная рекомендация. Система ничего не исполняет._"]
     return title, "\n".join(lines)
@@ -136,7 +144,9 @@ def main() -> None:
         "last_block_ts": ds["last_block_ts"], "live": True, "every_minutes": 15}))
 
     notify = None
-    if after and (before is None or (after["id"], after["status"]) != (before["id"], before["status"])):
+    # notify when the status changes (a new WAIT with other reasons is not news)
+    if after and (before is None or after["status"] != before["status"]
+                  or (after["id"] != before["id"] and after["type"] != "WAIT")):
         title, body = message(after)
         notify = {"title": title, "body": body}
     elif new_watch:

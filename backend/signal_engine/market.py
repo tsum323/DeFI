@@ -58,9 +58,17 @@ def human_price(sqrt_price: int, d0: int, d1: int) -> float:
     return (sqrt_price / 2 ** 96) ** 2 * 10 ** (d0 - d1)
 
 
-def snapshot(ds: Dataset, state: PoolState, now_ts: int, vol_median: float) -> MarketSnapshot:
+SLOT_SECONDS = 12  # Ethereum post-merge block time (missed slots only make blocks rarer)
+
+
+def snapshot(ds: Dataset, state: PoolState, now_ts: int, vol_median: float,
+             synced_block: int | None = None) -> MarketSnapshot:
+    """`synced_block`: the sync covers the pool up to this block. The state is the one after
+    the last pool event, still valid when no event followed; data age is then measured from
+    the synced block (its time estimated as 12 s per block, a lower bound on the time)."""
     block = state.block
     ts = ds.blocks[block][0]
+    covered_ts = ts + SLOT_SECONDS * max(0, (synced_block or block) - block)
     market = MarketView()
     _prefill_market(market, ds, block, lookback_seconds=35 * DAY)
     sp = state.sqrt_price
@@ -98,7 +106,7 @@ def snapshot(ds: Dataset, state: PoolState, now_ts: int, vol_median: float) -> M
     vol7 = market.vol_annual(ts, 7 * DAY)
     eth = [r for r in ds.eth_usd if r[0] <= block]
     return MarketSnapshot(
-        block=block, timestamp=ts, data_age_seconds=max(0, now_ts - ts), sqrt_price=sp,
+        block=block, timestamp=ts, data_age_seconds=max(0, now_ts - max(ts, min(covered_ts, now_ts))), sqrt_price=sp,
         tick=state.tick, price=price, active_liquidity=state.liquidity, tvl_token0=tvl0,
         tvl_token1=tvl1, tvl_usd=tvl_usd, volume_24h_usd=v24_usd, volume_7d_usd=v7_usd,
         fees_7d_usd=fees7, fee_apr_7d=fees7 / tvl_usd * 365 / 7 if tvl_usd else 0.0,

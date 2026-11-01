@@ -18,6 +18,8 @@ import sys
 import time
 from datetime import datetime, timedelta, timezone
 
+from sqlalchemy import select
+
 from backend.backtesting.dataset import ROOT, cached_state_at, load_dataset
 from backend.core.config import load_config
 from backend.database import schema as S
@@ -59,7 +61,10 @@ def main() -> None:
     state = cached_state_at(ds, latest_event_block(ds))
     now = int(time.time())
     vol_med = statistics.median(s.realized_vol for s in study.segments)
-    snap = snapshot(ds, state, now, vol_med)
+    with engine.connect() as c:
+        synced = c.execute(select(S.sync_state.c.last_block).where(
+            S.sync_state.c.address == p.address, S.sync_state.c.stream == "pool_logs")).scalar()
+    snap = snapshot(ds, state, now, vol_med, synced_block=synced)
     meta = {"pool": cfg.primary_pool, "pair": f"{p.token0}/{p.token1}", "network": p.network,
             "pool_address": p.address, "fee_tier": p.fee / 1e6}
     d = evaluate_market(engine, ds, state, snap, table, load_strategies(engine), study, sc, meta,
