@@ -9,8 +9,8 @@
    "sha256": "0913321135ed3c28905c394e8b7db0a8077ae610fcc91cbdb4653296f471d372"
   },
   "forward_tests": {
-   "rows": 3,
-   "sha256": "fd771fcaf485c16c4f50666c7d70b4b0433bf6f46d1391a648509155a9c9a2ad"
+   "rows": 6,
+   "sha256": "3e33b1f858819132e19a215eb6bd0bb51f0ae7b4770602402ab187f8c6a0d7e4"
   },
   "hypotheses": {
    "rows": 5,
@@ -25,16 +25,16 @@
    "sha256": "e04134c1b590548dce6cad510bb8efaa2b04549d8833b0bbf085b2ee7f8af8b3"
   },
   "market_evaluations": {
-   "rows": 7,
-   "sha256": "ba64bf89f7f6156cf24b4e045ab2b81d2b0649fc86cbdff5452349f20630a3bf"
+   "rows": 9,
+   "sha256": "76fdaee458df0b41d97c879a4b167a407fbb93a121e67dd36139561756c8e20a"
   },
   "signal_events": {
-   "rows": 2,
-   "sha256": "e52552e3103e72e3dcdcdc319f0517de3d4f210a5ad8115994bbcd23c3aa2960"
+   "rows": 3,
+   "sha256": "ebb576cf0e3c2c15d4d854556a6844dc2989f022df5b16d9e80193a1761b13e4"
   },
   "signals": {
-   "rows": 2,
-   "sha256": "b728fccd361e14436fa91eb03c047bc0d873506dfb9cadbeade1653b51efbe92"
+   "rows": 3,
+   "sha256": "8bdec2d0091f12ee4b77ef409bb3f6a5c022badbc20e5ca98fa8c29a41e4cbcb"
   },
   "strategies": {
    "rows": 909,
