@@ -34,8 +34,10 @@ Factory не подтверждены через RPC (только CREATE2-вы�
 - ⏳ Калибровка газа по receipts NonfungiblePositionManager
 - ⏳ Фикстуры реальных логов для теста декодера (`tests/fixtures/real_pool_logs.json`)
 
-**Блокер:** в `ETH_RPC_URL` вместо ключа Alchemy стоит шаблон. Нужно задать в настройках
-окружения реальное значение `https://eth-mainnet.g.alchemy.com/v2/<ключ>`.
+**Блокер:** сеть открыта, ключ Alchemy рабочий, но бесплатные тарифы не годятся для загрузки
+истории: Alchemy Free — `eth_getLogs` ≤ 10 блоков, dRPC free — ~100 блоков, PublicNode — не
+архивный (только последние ~2–3 дня). Нужен архивный доступ: Alchemy PAYG (или токен PublicNode /
+платный dRPC). Подробности — `docs/DATA_SOURCES.md` §2.
 
 ## Этап 3 — Математическое ядро ⏳ (не зависит от сети — можно начинать параллельно)
 - TickMath, FullMath, SqrtPriceMath, SwapMath, LiquidityAmounts — целочисленно

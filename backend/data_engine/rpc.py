@@ -18,6 +18,8 @@ from dataclasses import dataclass, field
 
 from backend.core.safety import assert_read_only
 
+USER_AGENT = "defi-liquidity-lab/0.2 (read-only research)"
+
 # Provider messages meaning "your eth_getLogs window is too large".
 _RANGE_MARKERS = (
     "query returned more than",
@@ -30,6 +32,7 @@ _RANGE_MARKERS = (
     "response size",
     "limit exceeded",
     "query timeout",
+    "ranges over",
 )
 
 
@@ -84,7 +87,14 @@ class RpcClient:
     def _post(self, payload: object) -> object:
         body = json.dumps(payload).encode()
         req = urllib.request.Request(
-            self.url, body, {"content-type": "application/json", "accept": "application/json"}
+            self.url, body,
+            {
+                "content-type": "application/json",
+                "accept": "application/json",
+                # Public endpoints behind Cloudflare reject the default
+                # "Python-urllib" agent with HTTP 403 (error code 1010).
+                "user-agent": USER_AGENT,
+            },
         )
         last_exc: str = "unknown"
         for attempt in range(self.max_retries + 1):
@@ -98,6 +108,12 @@ class RpcClient:
                     return json.loads(r.read())
             except urllib.error.HTTPError as exc:
                 last_exc = f"HTTP {exc.code}"
+                # Many providers (Alchemy, dRPC, PublicNode) send a JSON-RPC
+                # error body with 4xx; surface it so call() can classify it
+                # (e.g. RangeTooLarge lets the syncer shrink its window).
+                parsed = self._json_error_body(exc)
+                if parsed is not None and exc.code not in (429, 500, 502, 503, 504):
+                    return parsed
                 if exc.code not in (408, 425, 429, 500, 502, 503, 504):
                     break
             except (urllib.error.URLError, TimeoutError, OSError, json.JSONDecodeError) as exc:
@@ -109,6 +125,16 @@ class RpcClient:
                 delay = self.backoff[min(attempt, len(self.backoff) - 1)]
                 time.sleep(delay * (0.75 + random.random() / 2))
         raise EndpointUnavailable(f"[{self.name}] unavailable after retries: {last_exc}")
+
+    @staticmethod
+    def _json_error_body(exc: urllib.error.HTTPError) -> dict | None:
+        try:
+            body = json.loads(exc.read())
+        except (OSError, ValueError):
+            return None
+        if isinstance(body, dict) and isinstance(body.get("error"), dict):
+            return body
+        return None
 
     @staticmethod
     def _classify(endpoint: str, method: str, err: dict) -> RpcError:

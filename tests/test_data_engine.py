@@ -205,3 +205,50 @@ def test_decode_recorded_real_logs():
         if spec.name == "Swap":
             assert -887272 <= ev["tick"] <= 887272
             assert (ev["amount0"] > 0) != (ev["amount1"] > 0)  # one side in, one side out
+
+
+def _http_error(code: int, body: bytes):
+    import io
+    import urllib.error
+    return urllib.error.HTTPError("http://x", code, "err", {}, io.BytesIO(body))
+
+
+def test_http_4xx_json_range_error_becomes_range_too_large(monkeypatch):
+    # SYNTHETIC: replay of real Alchemy / dRPC free-tier HTTP 400 bodies.
+    import urllib.request
+    bodies = [
+        b'{"jsonrpc":"2.0","id":1,"error":{"code":-32600,"message":"Under the Free tier '
+        b'plan, you can make eth_getLogs requests with up to a 10 block range."}}',
+        b'{"id":1,"jsonrpc":"2.0","error":{"message":"ranges over 10000 blocks are not '
+        b'supported on free plan","code":35}}',
+    ]
+    for body in bodies:
+        def fake(*_a, _b=body, **_k):
+            raise _http_error(400, _b)
+        monkeypatch.setattr(urllib.request, "urlopen", fake)
+        c = RpcClient("t", "https://example.invalid/rpc", max_retries=0)
+        with pytest.raises(RangeTooLarge):
+            c.get_logs("0x" + "11" * 20, 1, 100, [])
+
+
+def test_rpc_sends_explicit_user_agent(monkeypatch):
+    # Cloudflare-fronted public RPCs answer 403/1010 to the default Python-urllib agent.
+    import urllib.request
+    seen = {}
+
+    class Resp:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return False
+
+        def read(self):
+            return b'{"jsonrpc":"2.0","id":1,"result":"0x1"}'
+
+    def fake(req, *a, **k):
+        seen["ua"] = req.get_header("User-agent")
+        return Resp()
+    monkeypatch.setattr(urllib.request, "urlopen", fake)
+    RpcClient("t", "https://example.invalid/rpc", max_retries=0).chain_id()
+    assert seen["ua"] and "python-urllib" not in seen["ua"].lower()
