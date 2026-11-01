@@ -60,6 +60,11 @@ def encode_word(typ: str, value) -> bytes:
         return bytes.fromhex(value.lower().removeprefix("0x")).rjust(32, b"\0")
     if typ == "bool":
         return int(bool(value)).to_bytes(32, "big")
+    if typ == "bytes32":
+        raw = bytes.fromhex(value.removeprefix("0x"))
+        if len(raw) != 32:
+            raise ValueError("bytes32 must be 32 bytes")
+        return raw
     if typ.startswith(("uint", "int")):
         return (value % (1 << 256)).to_bytes(32, "big")
     raise NotImplementedError(typ)

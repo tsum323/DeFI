@@ -1,0 +1,48 @@
+{
+ "pool": "wbtc_usdc_3000",
+ "address": "0x99ac8cA7087fA4A2A1FB6357269965A2014ABc35",
+ "endpoint": "drpc",
+ "checkpoints": [
+  {
+   "block": 14119052,
+   "checks": 22,
+   "mismatches": []
+  },
+  {
+   "block": 15862098,
+   "checks": 22,
+   "mismatches": []
+  },
+  {
+   "block": 17605199,
+   "checks": 22,
+   "mismatches": []
+  },
+  {
+   "block": 19348315,
+   "checks": 22,
+   "mismatches": []
+  },
+  {
+   "block": 21091008,
+   "checks": 21,
+   "mismatches": []
+  },
+  {
+   "block": 22833990,
+   "checks": 22,
+   "mismatches": []
+  },
+  {
+   "block": 24576990,
+   "checks": 22,
+   "mismatches": []
+  },
+  {
+   "block": 26319970,
+   "checks": 22,
+   "mismatches": []
+  }
+ ],
+ "mismatches": 0
+}

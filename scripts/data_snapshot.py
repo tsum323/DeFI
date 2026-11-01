@@ -22,7 +22,7 @@ from backend.database import schema as S
 
 ROOT = Path(__file__).resolve().parent.parent
 SIDE_FILES = ("pool_verification.json", "fee_tier_comparison.json", "gas_calibration.json",
-              "math_validation.json")
+              "math_validation.json", "replay_checkpoints.json")
 
 
 def main() -> None:
