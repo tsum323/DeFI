@@ -90,6 +90,8 @@ python -m scripts.verify_pools           # getPool, token0/1, fee, tickSpacing, 
 python -m scripts.compare_fee_tiers      # 30 дней: swaps, объём, комиссии LP, TVL, fee/TVL → data/fee_tier_comparison.json
 python -m scripts.sync_pool --endpoint drpc   # история событий primary_pool в БД (возобновляемо, бесплатно)
 python -m scripts.data_snapshot export   # сохранить базу в data_snapshots/ для git
+python -m scripts.calibrate_gas          # газ по реальным receipts → data/gas_calibration.json
+python -m scripts.export_fixtures        # реальные логи для тестов → tests/fixtures/
 ```
 
 **Правило выбора основного fee tier:** основным становится пул с большей выручкой LP

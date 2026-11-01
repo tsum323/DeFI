@@ -180,9 +180,10 @@ class RpcClient:
                    for i, (m, p) in enumerate(calls)]
         try:
             resp = self._post(payload)
-        except RateLimited:
-            # Large batches cost many compute units at once; split and retry.
-            if len(calls) == 1:
+        except EndpointUnavailable as exc:
+            # Large batches cost many compute units at once (429) and some free
+            # plans reject batches above a few items (dRPC: HTTP 500); split.
+            if len(calls) == 1 or not (isinstance(exc, RateLimited) or "HTTP 500" in str(exc)):
                 raise
             mid = len(calls) // 2
             return self.batch(calls[:mid]) + self.batch(calls[mid:])

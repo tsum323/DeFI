@@ -13,12 +13,19 @@ data_engine:
   retry_backoff_seconds: [2, 4, 8, 16, 32]
 
 costs:
-  # ASSUMPTIONS until calibrated from real NonfungiblePositionManager receipts (stage 2/4).
+  # MODELED: medians of gasUsed from 860 real receipts of wbtc_usdc_3000 txs, 2021-2026
+  # (scripts.calibrate_gas, 2026-11-01; data_snapshots/wbtc_usdc_3000/gas_calibration.json).
+  # Stable across years (yearly medians within ~10%). Was: 500k / 200k / 250k / 180k assumptions.
   gas_units:
-    mint_new_position: 500000
-    increase_liquidity: 200000
-    decrease_liquidity_and_collect: 250000
-    swap_for_rebalance: 180000
+    mint_new_position: 436000               # n=292, p25-p75 402k-446k, p90 488k
+    increase_liquidity: 200000              # n=97,  p25-p75 189k-238k, p90 245k
+    decrease_liquidity_and_collect: 200000  # n=260, p25-p75 183k-215k, p90 222k
+    swap_for_rebalance: 127000              # n=211 plain single-hop router swaps, p90 155k
+  gas_units_p90:                            # conservative set for sensitivity tests
+    mint_new_position: 488000
+    increase_liquidity: 245000
+    decrease_liquidity_and_collect: 222000
+    swap_for_rebalance: 155000
   gas_price_source: block_base_fee_plus_priority   # historical baseFeePerGas per block
   priority_fee_gwei: 1.0
 

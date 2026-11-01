@@ -17,7 +17,7 @@
 **Известные ограничения этапа:** существование пулов on-chain и блок создания
 Factory не подтверждены через RPC (только CREATE2-вывод).
 
-## Этап 2 — Data Engine 🟡 (история загружена полностью; осталась калибровка газа и фикстуры)
+## Этап 2 — Data Engine ✅
 - ✅ RPC-клиент (`backend/data_engine/rpc.py`): allowlist на каждом вызове, ретраи/backoff,
   rate-limit, batch, классификация «слишком большое окно»; URL с ключом нигде не выводится;
   распознаётся незаполненный шаблон ключа
@@ -38,8 +38,12 @@ Factory не подтверждены через RPC (только CREATE2-вы�
 - ✅ Снимок данных в репозитории: `data_snapshots/wbtc_usdc_3000/` (66 МБ, 10 частей xz ≤ 8.5 МБ,
   sha256 в `manifest.json`). Восстановление `python -m scripts.data_snapshot restore` (~2 мин)
   проверено: все таблицы совпали с исходной базой
-- ⏳ Калибровка газа по receipts NonfungiblePositionManager
-- ⏳ Фикстуры реальных логов для теста декодера (`tests/fixtures/real_pool_logs.json`)
+- ✅ Калибровка газа (`calibrate_gas`): 1 440 реальных receipts 2021–2026 (стратификация по годам),
+  медианы gasUsed → `config/lab.yaml costs.gas_units` (MODELED): mint 436k (было 500k),
+  increase 200k, decrease+collect 200k (было 250k), простой swap 127k (было 180k);
+  p90 → `gas_units_p90` для тестов чувствительности. По годам медианы стабильны (±10%)
+- ✅ Фикстуры реальных логов (`export_fixtures` → `tests/fixtures/real_pool_logs.json`, 42 лога
+  всех 9 типов); тест проверяет tick ↔ sqrtPriceX96, кратность тиков 60, знаки сумм
 
 **Известные ограничения:**
 - Лимит Alchemy на текущий месяц исчерпан; дальнейшая работа — через бесплатный dRPC
@@ -50,6 +54,10 @@ Factory не подтверждены через RPC (только CREATE2-вы�
   `data_snapshot restore`, затем `sync_pool --endpoint drpc` догружает свежие блоки.
   Снимок обновлять командой `python -m scripts.data_snapshot export` (перезаписывает части).
 - PublicNode бесплатно — не архив (только ~2–3 дня), `sync_pool` его не использует.
+- Газ: средние величины; реальный газ mint выше, если тики позиции ещё не инициализированы
+  (p90 ≈ 488k). Цена газа — base fee блока + приоритет `priority_fee_gwei` (предположение).
+- Распределение ликвидности, tick crossings и fee growth не хранятся отдельно — они строятся
+  replay'ем событий в этапах 3–4 (DATA_SOURCES §1).
 
 ## Этап 3 — Математическое ядро ⏳ (не зависит от сети — можно начинать параллельно)
 - TickMath, FullMath, SqrtPriceMath, SwapMath, LiquidityAmounts — целочисленно

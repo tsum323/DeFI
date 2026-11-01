@@ -21,7 +21,7 @@ from backend.data_engine.snapshot import export_pool, restore_pool
 from backend.database import schema as S
 
 ROOT = Path(__file__).resolve().parent.parent
-SIDE_FILES = ("pool_verification.json", "fee_tier_comparison.json")
+SIDE_FILES = ("pool_verification.json", "fee_tier_comparison.json", "gas_calibration.json")
 
 
 def main() -> None:

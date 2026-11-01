@@ -198,13 +198,37 @@ def test_min_chunk_exhausted_records_gap(engine):
 @pytest.mark.skipif(not (FIXTURES / "real_pool_logs.json").exists(),
                     reason="no recorded real logs yet")
 def test_decode_recorded_real_logs():
+    # EXACT real mainnet logs (scripts.export_fixtures); checks are independent of the decoder:
+    # tick must equal floor(log_1.0001(price)) of the sqrtPriceX96 in the same event.
+    from decimal import Decimal, getcontext
+    getcontext().prec = 80
+    ln_base = Decimal("1.0001").ln()
+
+    def tick_of(sqrt_price_x96: int) -> int:
+        price = (Decimal(sqrt_price_x96) / Decimal(2 ** 96)) ** 2
+        return int((price.ln() / ln_base).to_integral_value(rounding="ROUND_FLOOR"))
+
     data = json.loads((FIXTURES / "real_pool_logs.json").read_text())
+    spacing = data["tick_spacing"]
+    seen = set()
     for lg in data["logs"]:
         spec = abi.POOL_EVENTS_BY_TOPIC[lg["topics"][0].lower()]
+        assert spec.name == lg["event"]
         ev = spec.decode(lg)
+        seen.add(spec.name)
+        if spec.name in ("Swap", "Initialize"):
+            assert 4295128739 <= ev["sqrtPriceX96"] < 1461446703485210103287273052203988822378723970342
+            assert ev["tick"] == tick_of(ev["sqrtPriceX96"])
         if spec.name == "Swap":
-            assert -887272 <= ev["tick"] <= 887272
+            assert ev["liquidity"] >= 0
             assert (ev["amount0"] > 0) != (ev["amount1"] > 0)  # one side in, one side out
+        if spec.name in ("Mint", "Burn", "Collect"):
+            assert -887272 <= ev["tickLower"] < ev["tickUpper"] <= 887272
+            assert ev["tickLower"] % spacing == 0 and ev["tickUpper"] % spacing == 0
+            assert ev["amount0"] >= 0 and ev["amount1"] >= 0
+        if spec.name == "Mint":
+            assert ev["amount"] > 0
+    assert {"Swap", "Mint", "Burn", "Collect", "Initialize"} <= seen
 
 
 def _http_error(code: int, body: bytes):
@@ -357,3 +381,26 @@ def test_snapshot_roundtrip_is_exact(engine, tmp_path):
     part.write_bytes(part.read_bytes()[:-1] + b"\x00")
     with pytest.raises(SnapshotError):
         restore_pool(other, tmp_path / "snap")
+
+
+def test_calibrate_gas_classify():
+    # SYNTHETIC receipts covering each category of scripts.calibrate_gas.
+    from scripts.calibrate_gas import (T_DEC, T_INC, T_NPM_COLLECT, T_SWAP, T_TRANSFER,
+                                       ZERO_WORD, classify)
+    npm, pool, router = "0x" + "aa" * 20, "0x" + "bb" * 20, "0x" + "cc" * 20
+    word = lambda a: "0x" + "00" * 12 + a[2:]  # noqa: E731
+
+    def rc(to, logs, status="0x1"):
+        return {"status": status, "to": to,
+                "logs": [{"address": a, "topics": t} for a, t in logs]}
+    mint_nft = (npm, [T_TRANSFER, ZERO_WORD, word(router), "0x" + "01".rjust(64, "0")])
+    assert classify(rc(npm, [mint_nft, (npm, [T_INC, "0x1"])]), npm, pool) == "mint_new_position"
+    assert classify(rc(npm, [(npm, [T_INC, "0x1"])]), npm, pool) == "increase_liquidity"
+    assert classify(rc(npm, [(npm, [T_DEC, "0x1"]), (npm, [T_NPM_COLLECT, "0x1"])]),
+                    npm, pool) == "decrease_liquidity_and_collect"
+    swap = (pool, [T_SWAP, word(router), word(router)])
+    assert classify(rc(router, [swap, ("0x1", ["0x"]), ("0x2", ["0x"])]), npm, pool) \
+        == "swap_for_rebalance"
+    assert classify(rc("0x" + "dd" * 20, [swap]), npm, pool) == "swap_other"
+    assert classify(rc(npm, [(npm, [T_INC, "0x1"])], status="0x0"), npm, pool) == "failed"
+    assert classify(rc(router, [(npm, [T_INC, "0x1"])]), npm, pool) == "other"
