@@ -6,7 +6,17 @@ import Portfolio from "./pages/Portfolio";
 import Ranking from "./pages/Ranking";
 import Research from "./pages/Research";
 import Signals from "./pages/Signals";
+import { STATIC, type SnapshotInfo } from "./api";
 import { Loading } from "./components/ui";
+import { useApi } from "./components/useApi";
+import { date } from "./format";
+
+function SnapshotBanner() {
+  const { data } = useApi<SnapshotInfo>("/api/snapshot");
+  if (!data) return null;
+  return <div className="snapshot">Снимок панели на {date(data.exported_at)} · данные блокчейна до блока{" "}
+    {data.last_block.toLocaleString("ru-RU")} ({date(data.last_block_ts)}). Обновляется при следующей сессии.</div>;
+}
 
 // Plotly (~4 MB) is only needed on the strategy page: load it on demand
 const StrategyDetails = lazy(() => import("./pages/StrategyDetails"));
@@ -30,6 +40,7 @@ export default function App() {
         <div className="side-foot">только чтение · ничего не исполняется</div>
       </aside>
       <main className="main">
+        {STATIC && <SnapshotBanner />}
         <Routes>
           <Route path="/" element={<Overview />} />
           <Route path="/ranking" element={<Ranking />} />

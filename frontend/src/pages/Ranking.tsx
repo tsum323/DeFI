@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import type { Ranking, RankingRow } from "../api";
+import { STATIC, type Ranking, type RankingRow } from "../api";
 import { Badge, Loading, Pill } from "../components/ui";
 import { useApi } from "../components/useApi";
 import { num, pct, pctAbs, sign, usd } from "../format";
@@ -36,7 +36,7 @@ export default function RankingPage() {
     <>
       <h1>Рейтинг стратегий <Badge label={data.label} /></h1>
       <p className="lead">{rows.length} стратегий · значения — {data.per}. Победитель выбирается по оценке устойчивости,
-        а не по максимальной доходности.</p>
+        а не по максимальной доходности.{STATIC && " В снимке графики есть у выделенных ссылкой стратегий."}</p>
       <input className="search" placeholder="Фильтр по названию…" value={q} onChange={(e) => setQ(e.target.value)} />
       <div className="table-wrap">
         <table className="table">
@@ -52,7 +52,7 @@ export default function RankingPage() {
             {rows.map((r, i) => (
               <tr key={r.spec_hash}>
                 <td className="muted">{i + 1}</td>
-                <td><Link to={`/strategy/${r.spec_hash}`}>{r.name}</Link></td>
+                <td>{!STATIC || r.has_details ? <Link to={`/strategy/${r.spec_hash}`}>{r.name}</Link> : r.name}</td>
                 <td className="muted">{r.pair}</td>
                 {COLS.map((c) => <td key={c.key} className={c.tone?.(r) ?? ""}>{c.fmt(r)}</td>)}
                 <td>{r.flags.map((f) => <Pill key={f} tone="warn">{f}</Pill>)}</td>
