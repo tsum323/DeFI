@@ -32,7 +32,7 @@ from backend.backtesting.pool_replay import PoolReplay, PoolState
 
 LONDON_BLOCK = 12_965_000
 GWEI = 10 ** 9
-RUIN_DIVISOR = 100  # principal below 1% of capital -> strategy stops ("ruined")
+RUIN_DIVISOR = 100  # equity below 1% of capital -> strategy stops ("ruined")
 
 
 class SimError(RuntimeError):
@@ -341,8 +341,15 @@ class _Sim:
         if self.pos is not None and spec.rebalance != "none" and self._should_rebalance(block, ts):
             il = self._close()
             self.il_realized += il
-            if _value1(self.x, self.y, s.sqrt_price) < spec.capital_token1 // RUIN_DIVISOR:
-                # principal destroyed (swap fees / IL): stop instead of minting dust
+            equity = (_value1(self.x, self.y, s.sqrt_price)
+                      + _value1(self.fees_a[0], self.fees_a[1], s.sqrt_price) - self.gas_cost)
+            next_gas = self._gas_cost_token1(block, self.gas["decrease_liquidity_and_collect"]
+                                             + self.gas["mint_new_position"]
+                                             + self.gas["swap_for_rebalance"])
+            if (equity - next_gas < spec.capital_token1 // RUIN_DIVISOR
+                    or _value1(self.x, self.y, s.sqrt_price) < spec.capital_token1 // RUIN_DIVISOR):
+                # the account (principal + collected fees - gas, conservative model A)
+                # could not pay for another rebalance: stop instead of going below zero
                 self.ruined_block = block
             else:
                 self._open(block, "rebalance", self.gas["decrease_liquidity_and_collect"]

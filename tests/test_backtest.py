@@ -57,8 +57,11 @@ def synthetic_history(n_swaps: int = 400, seed: int = 1, drift: float = 0.0, liq
     return events, blocks
 
 
-def dataset(events, blocks):
-    return Dataset(events=events, blocks=blocks, eth_usd=[[B0 - 1, T0 - 12, 2000 * 10 ** 8, T0 - 12]],
+ETH_ANSWER = 1  # SYNTHETIC ETH/USD answer (1e8 = $1) keeping gas proportionate to the tiny capital
+
+
+def dataset(events, blocks, eth_answer=ETH_ANSWER):
+    return Dataset(events=events, blocks=blocks, eth_usd=[[B0 - 1, T0 - 12, eth_answer, T0 - 12]],
                    fee=3000, tick_spacing=60, gas_units=GAS, decimals0=18, decimals1=18)
 
 
@@ -83,9 +86,10 @@ def test_accounting_identities_and_fee_bounds():
     assert 0 < m["fees_a"] <= m["fees_b"]
     assert m["rebalances"] == 0 and m["time_in_range"] == 1.0
     assert m["gas_cost"] == res.actions[0].gas_cost_token1 > 0
-    # gas = (436k mint + 127k swap) * (20 + 1 gwei) * $2000, in 18-decimal token1
+    # gas = (436k mint + 127k swap) * (20 + 1 gwei) * ETH/USD, in 18-decimal token1
     assert res.actions[0].gas_units == 436_000 + 127_000
-    assert m["gas_cost"] == (436_000 + 127_000) * 21 * 10 ** 9 * 2000
+    assert m["gas_cost"] == (436_000 + 127_000) * 21 * 10 ** 9 * ETH_ANSWER * 10 ** 18 // 10 ** 26
+    assert m["gas_cost"] < m["capital"] // 100
 
 
 def test_fee_model_b_equals_share_of_pool_fees():
@@ -227,3 +231,15 @@ def test_ruinous_strategy_stops_instead_of_failing(monkeypatch):
     rb = r.metrics["ruined_block"]
     assert all(a.block < rb for a in r.actions)  # nothing is opened after ruin
     assert r.timeseries[-1]["value_lp"] > 0 and not r.timeseries[-1]["in_range"]
+
+
+def test_gas_can_not_drive_equity_far_below_zero():
+    # SYNTHETIC: absurd gas price makes every rebalance unaffordable quickly
+    events, blocks = synthetic_history(n_swaps=600, drift=0.3, seed=3)
+    pricey = {b: (ts, 10 ** 15) for b, (ts, _) in blocks.items()}  # 1e6 gwei
+    r = simulate(dataset(events, pricey), spec(width_pct=0.01, rebalance="on_exit"))
+    m = r.metrics
+    assert m["ruined"]
+    # loss is bounded by capital plus at most one action's gas
+    one_action = max(a.gas_cost_token1 for a in r.actions)
+    assert m["net_a"] >= -m["capital"] - one_action
