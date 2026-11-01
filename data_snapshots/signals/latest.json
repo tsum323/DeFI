@@ -4,7 +4,7 @@
  "snapshot": {
   "block": 26321964,
   "timestamp": 1793560703,
-  "data_age_seconds": 846,
+  "data_age_seconds": 848,
   "sqrt_price": "2209403168899781528997088444662",
   "tick": 66566,
   "price": 77766.18204585605,
@@ -31,7 +31,7 @@
  },
  "payload": {
   "type": "WAIT",
-  "created_at": 1793568773,
+  "created_at": 1793569915,
   "block": 26321964,
   "pool": "wbtc_usdc_3000",
   "pair": "WBTC/USDC",
@@ -43,91 +43,91 @@
    {
     "name": "no_validated_strategy",
     "passed": false,
-    "value": "0 of 296 strategies pass all filters",
+    "value": "0 of 396 strategies pass all filters",
     "threshold": "all SPEC 11.4 checks"
    }
   ],
   "closest_candidates": [
    {
-    "strategy": "w0.3_r1=0.7_exit_d0",
+    "strategy": "w0.2_r1=0.9_exit_d7200",
     "failed": [
      "stable_across_periods"
     ],
-    "oos_mean_excess": 0.0326,
-    "oos_mean_roi": 0.019275239671428572
+    "oos_mean_excess": 0.045,
+    "oos_mean_roi": 0.031647302042857144
    },
    {
-    "strategy": "w0.3_r1=0.7_exit_d300",
+    "strategy": "w0.2_r1=0.9_exit_d7200_cool72h",
     "failed": [
      "stable_across_periods"
     ],
-    "oos_mean_excess": 0.0317,
-    "oos_mean_roi": 0.018356368571428573
+    "oos_mean_excess": 0.0447,
+    "oos_mean_roi": 0.03133015311428571
    },
    {
-    "strategy": "w0.3_r1=0.7_exit_d7200",
+    "strategy": "w0.2_r1=0.9_static",
     "failed": [
      "stable_across_periods"
     ],
-    "oos_mean_excess": 0.0299,
-    "oos_mean_roi": 0.01656042341428571
+    "oos_mean_excess": 0.0442,
+    "oos_mean_roi": 0.03082698547142857
    },
    {
-    "strategy": "w0.2_r1=0.7_static",
+    "strategy": "w0.15_r1=0.9_static",
     "failed": [
      "stable_across_periods"
     ],
-    "oos_mean_excess": 0.027,
-    "oos_mean_roi": 0.013678296757142857
+    "oos_mean_excess": 0.0428,
+    "oos_mean_roi": 0.029507283428571427
    },
    {
-    "strategy": "w0.3_r1=0.7_static",
+    "strategy": "w0.2_r1=0.8_exit_d7200_cool72h",
     "failed": [
      "stable_across_periods"
     ],
-    "oos_mean_excess": 0.026,
-    "oos_mean_roi": 0.012630009828571428
+    "oos_mean_excess": 0.0425,
+    "oos_mean_roi": 0.0292025665
    }
   ],
   "watch": [
    {
-    "strategy": "w0.3_r1=0.7_exit_d0",
-    "spec_hash": "cf1820f3625b7ec71b1ada6ec2356ec88b997c4a834a68a3539493710b108ba9",
+    "strategy": "w0.2_r1=0.9_exit_d7200",
+    "spec_hash": "3d54045d61114bcac72ffa5eafd4cb2a864a2eb6ef89f1280d475d0b970952a7",
     "failed": "stable_across_periods",
     "value": {
-     "is_mean_excess": -0.0373,
+     "is_mean_excess": -0.0432,
      "is_positive": 5
     },
     "threshold": "IS excess > 0 in >= half of segments",
-    "oos_mean_excess": 0.0326,
-    "oos_mean_roi": 0.019275239671428572,
-    "oos_contaminated": false
+    "oos_mean_excess": 0.045,
+    "oos_mean_roi": 0.031647302042857144,
+    "oos_contaminated": true
    },
    {
-    "strategy": "w0.3_r1=0.7_exit_d300",
-    "spec_hash": "4620cd3ead8eae30de21e2b0691e407ae39246bed79b8620ce15e4f49e9b2471",
+    "strategy": "w0.2_r1=0.9_exit_d7200_cool72h",
+    "spec_hash": "b66131620331bbebbada0ba13befc2c8b5bcd4eb89ee2db0f138f585468387d8",
     "failed": "stable_across_periods",
     "value": {
-     "is_mean_excess": -0.0226,
+     "is_mean_excess": -0.0435,
      "is_positive": 5
     },
     "threshold": "IS excess > 0 in >= half of segments",
-    "oos_mean_excess": 0.0317,
-    "oos_mean_roi": 0.018356368571428573,
-    "oos_contaminated": false
+    "oos_mean_excess": 0.0447,
+    "oos_mean_roi": 0.03133015311428571,
+    "oos_contaminated": true
    },
    {
-    "strategy": "w0.3_r1=0.7_exit_d7200",
-    "spec_hash": "4f73532c183185c4e5d0c9813b3c5811f5a191345b71ed780bc06bbf08143c4a",
+    "strategy": "w0.2_r1=0.9_static",
+    "spec_hash": "f34cf0bd1513d5795ac32d5577cf9bc1e94be9cfacc047106722291a6764d80a",
     "failed": "stable_across_periods",
     "value": {
-     "is_mean_excess": -0.0191,
-     "is_positive": 5
+     "is_mean_excess": -0.0455,
+     "is_positive": 6
     },
     "threshold": "IS excess > 0 in >= half of segments",
-    "oos_mean_excess": 0.0299,
-    "oos_mean_roi": 0.01656042341428571,
-    "oos_contaminated": false
+    "oos_mean_excess": 0.0442,
+    "oos_mean_roi": 0.03082698547142857,
+    "oos_contaminated": true
    }
   ],
   "label": "SCENARIO"
