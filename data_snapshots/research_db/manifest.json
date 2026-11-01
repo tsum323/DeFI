@@ -1,5 +1,4 @@
 {
- "optuna": "optuna.sqlite",
  "tables": {
   "datasets": {
    "rows": 43,
@@ -11,7 +10,7 @@
   },
   "forward_tests": {
    "rows": 3,
-   "sha256": "409c74ab84a7e03dc739800f0129ce9bf9daf932446a6ceab21e3eed2e0676bf"
+   "sha256": "fd771fcaf485c16c4f50666c7d70b4b0433bf6f46d1391a648509155a9c9a2ad"
   },
   "hypotheses": {
    "rows": 5,
@@ -26,16 +25,16 @@
    "sha256": "e04134c1b590548dce6cad510bb8efaa2b04549d8833b0bbf085b2ee7f8af8b3"
   },
   "market_evaluations": {
-   "rows": 5,
-   "sha256": "26ad086481003741a539adb9b1f7b3a23ad2a11e790a58d9c4f0962ea02b5964"
+   "rows": 7,
+   "sha256": "ba64bf89f7f6156cf24b4e045ab2b81d2b0649fc86cbdff5452349f20630a3bf"
   },
   "signal_events": {
-   "rows": 1,
-   "sha256": "7cc562360f601f01f6851d109510d5cb507bbc1c1a708fc9b18b601ffd469a5b"
+   "rows": 2,
+   "sha256": "e52552e3103e72e3dcdcdc319f0517de3d4f210a5ad8115994bbcd23c3aa2960"
   },
   "signals": {
-   "rows": 1,
-   "sha256": "53eff5ae5f6fbccd0c96de1ed7b705cc6661259ceac391ceaf8f8dc4155c5014"
+   "rows": 2,
+   "sha256": "b728fccd361e14436fa91eb03c047bc0d873506dfb9cadbeade1653b51efbe92"
   },
   "strategies": {
    "rows": 909,
