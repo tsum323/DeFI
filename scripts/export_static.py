@@ -1,7 +1,10 @@
 """Export the dashboard as a static snapshot (no server needed).
 
   (cd frontend && VITE_STATIC=1 npx vite build --base=./ --outDir dist-static)
-  python -m scripts.export_static [--out DIR] [--details 30]
+  python -m scripts.export_static [--out DIR] [--details 30] [--site]
+
+--site also copies the result to site/, which GitHub Pages publishes from main
+(.github/workflows/pages.yml) at https://<owner>.github.io/<repo>/.
 
 Writes every API response as data/*.json next to the static build, with strategy
 charts for the most robust, the promising and the forward-tested strategies.
@@ -26,6 +29,7 @@ def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--out", default=str(ROOT / "frontend" / "dist-static"))
     ap.add_argument("--details", type=int, default=30)
+    ap.add_argument("--site", action="store_true", help="copy to site/ for GitHub Pages")
     args = ap.parse_args()
     out = Path(args.out)
     if not (out / "index.html").exists():
@@ -71,6 +75,12 @@ def main() -> None:
             js.write_text(text.replace("\ufffd", "\\ufffd"), encoding="utf-8")
     size = sum(p.stat().st_size for p in data.iterdir())
     print(f"exported {len(list(data.iterdir()))} files, {size / 1e6:.1f} MB -> {data}")
+    if args.site:
+        site = ROOT / "site"
+        shutil.rmtree(site, ignore_errors=True)
+        shutil.copytree(out, site)
+        (site / ".nojekyll").write_text("")  # serve files as they are
+        print(f"copied to {site.relative_to(ROOT)}/ (published by GitHub Pages from main)")
 
 
 if __name__ == "__main__":
