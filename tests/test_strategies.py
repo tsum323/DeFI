@@ -53,3 +53,28 @@ def test_mass_test_stores_and_skips_done_experiments():
     done = [r for r in rows if r["status"] == "done"]
     assert all(r["metrics"]["net_a"] == r["metrics"]["value_lp"] + r["metrics"]["fees_a"]
                - r["metrics"]["capital"] - r["metrics"]["gas_cost"] for r in done)
+
+
+def test_research_snapshot_roundtrip(tmp_path):
+    from sqlalchemy import func, select
+
+    from backend.database.research_snapshot import TABLES, export_research, restore_research
+    events, blocks = synthetic_history(n_swaps=200, drift=0.2, seed=4)
+    ds = dataset(events, blocks)
+    a = S.make_engine(f"sqlite:///{tmp_path / 'a.sqlite'}")
+    params = generate(SMALL, include_base=False)
+    desc = dataset_descriptor(ds, "synthetic", "0x" + "00" * 20, B0 + 5, B0 + 190, 10 ** 12,
+                              "gas_units", 1.0)
+    run_mass_test(a, ds, params, desc, batch=10)
+    export_research(a, tmp_path / "snap")
+    b = S.make_engine(f"sqlite:///{tmp_path / 'b.sqlite'}")
+    restore_research(b, tmp_path / "snap")
+    restore_research(b, tmp_path / "snap")  # idempotent
+    for name in TABLES:
+        t = getattr(S, name)
+        with a.connect() as ca, b.connect() as cb:
+            assert ca.execute(select(func.count()).select_from(t)).scalar_one() == \
+                cb.execute(select(func.count()).select_from(t)).scalar_one(), name
+
+
+SMALL = {"width_pct": [0.05, 0.3], "rules": [{"rebalance": "none"}], "ratio_token1": [None]}

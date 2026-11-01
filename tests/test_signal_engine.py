@@ -130,3 +130,47 @@ def test_monitor_transitions(tmp_path):
     assert monitor(reb, snap, ok, snap.timestamp)[0] == "REBALANCE"
     other = {**payload, "invalidation": {**payload["invalidation"], "trend_must_stay": "nope"}}
     assert monitor(other, snap, ok, snap.timestamp)[0] == "INVALIDATED"
+
+
+def test_virtual_portfolio_from_signal(tmp_path):
+    import json
+
+    from backend.backtesting.position_sim import simulate
+    from backend.virtual_portfolio.portfolio import journal, mark_all, open_new_positions
+    ds, st, snap, study, engine = setup(tmp_path)
+    # signal from the middle of the SYNTHETIC history, so there is a future to mark against
+    mid = sorted(ds.blocks)[len(ds.blocks) // 2]
+    st_mid = state_at(ds, mid)
+    snap_mid = snapshot(ds, st_mid, ds.blocks[mid][0] + 60, vol_median=1e9)
+    good, bad = StrategyParams(width_pct=0.3), StrategyParams(width_pct=0.05, rebalance="on_exit")
+    segs = [replace(s, trend=snap_mid.trend, vol_class=snap_mid.vol_class) for s in study.segments]
+    study = Study(segs, {})
+    t = table_with(study, good, bad)
+    d = evaluate_market(engine, ds, st_mid, snap_mid, t, strategies(good, bad), study,
+                        {**CFG, "validity_days": 1}, META, lambda b: state_at(ds, b),
+                        snap_mid.timestamp + 60)
+    assert d.decision == "OPEN CANDIDATE"
+    [pid] = open_new_positions(engine)
+    assert open_new_positions(engine) == [pid]  # idempotent
+    last = ds.events[-1].block
+    early = sorted(b for b in ds.blocks if b > mid)[50]
+    [m1] = mark_all(engine, ds, lambda b: state_at(ds, b), early)
+    assert m1["status"] == "open" and m1["opening_matches_signal"]
+    assert {"passive_full_range", "static_wide_50", "exit_rebalance_10"} <= set(m1["benchmarks"])
+    # the mark equals a plain backtest of the same strategy from the signal block
+    ref = simulate(ds, good.to_spec(mid, early, int(d.payload["capital_token1"])),
+                   start_state=state_at(ds, mid - 1))
+    assert m1["metrics"]["net_a"] == ref.metrics["net_a"]
+    [m2] = mark_all(engine, ds, lambda b: state_at(ds, b), last)  # validity (1 day) has ended
+    assert m2["status"] == "closed" and m2["outcome"] in ("success", "failure")
+    j = journal(engine)
+    assert j["counts"]["open_candidates"] == 1 and j["counts"]["active_positions"] == 0
+    assert j["counts"]["successful"] + j["counts"]["failed"] == 1
+    assert j["cumulative_net_a"] == m2["metrics"]["net_a"] and j["max_drawdown"] >= 0
+    # editing the signal afterwards is detected
+    with engine.begin() as c:
+        c.execute(S.signals.update().where(S.signals.c.id == d.signal_id)
+                  .values(payload_json=json.dumps({**d.payload, "range": {}})))
+    import pytest
+    with pytest.raises(RuntimeError):
+        mark_all(engine, ds, lambda b: state_at(ds, b), last)

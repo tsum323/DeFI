@@ -26,6 +26,7 @@ from backend.signal_engine.market import latest_event_block, snapshot
 from backend.strategies.mass_test import code_version, relabel_commit_versions
 from backend.validation.segments import load_segment_table
 from backend.validation.study import setup_study
+from backend.virtual_portfolio.portfolio import journal, mark_all, open_new_positions
 
 TYPE_RU = {"OPEN CANDIDATE": "КАНДИДАТ НА ОТКРЫТИЕ", "WAIT": "ЖДАТЬ", "HOLD": "ДЕРЖАТЬ",
            "REBALANCE": "ПЕРЕСТАВИТЬ ДИАПАЗОН", "CLOSE CANDIDATE": "КАНДИДАТ НА ЗАКРЫТИЕ",
@@ -85,6 +86,29 @@ def main() -> None:
                   f"OOS к пассивному {c['oos_mean_excess']:+.2%}, OOS ROI {c['oos_mean_roi']:+.2%} за отрезок")
     else:
         print("  " + "; ".join(str(x) for x in d.reasons))
+    opened = open_new_positions(engine)
+    marks = mark_all(engine, ds, lambda b: cached_state_at(ds, b), snap.block,
+                     priority_fee_gwei=cfg.lab["costs"]["priority_fee_gwei"])
+    j = journal(engine)
+    c = j["counts"]
+    usd = 10 ** ds.decimals1
+
+    def pct(x):
+        return "—" if x is None else f"{x:+.2%}"
+    print(f"\nВИРТУАЛЬНЫЙ ПОРТФЕЛЬ: сигналов {c['all']} (на открытие {c['open_candidates']}), "
+          f"активных позиций {c['active_positions']}, успешных {c['successful']}, неудачных "
+          f"{c['failed']}, отменённых {c['cancelled']}; совокупный результат "
+          f"${j['cumulative_net_a'] / usd:,.2f} (MODELED), за неделю {pct(j['return_week'])}, "
+          f"за месяц {pct(j['return_month'])}, макс. просадка {j['max_drawdown']:.1%}")
+    for m in marks:
+        mm = m["metrics"]
+        print(f"  позиция #{m['position_id']} {m['strategy']} [{m['status']}"
+              f"{'/' + m['outcome'] if m['outcome'] else ''}]: итог ${mm['net_a'] / usd:,.2f}, "
+              f"комиссии ${mm['fees_a'] / usd:,.2f}–${mm['fees_b'] / usd:,.2f}, к пассивному LP "
+              f"{'—' if m['vs_passive_a'] is None else f'${m['vs_passive_a'] / usd:,.2f}'}"
+              + ("" if m["opening_matches_signal"] else " — ОТКРЫТИЕ НЕ СОВПАЛО С СИГНАЛОМ"))
+    if opened:
+        print(f"  открыто виртуальных позиций: {len(opened)}")
     print("\nЭто исследовательский сигнал, а не инвестиционная рекомендация; система ничего не исполняет.")
     (ROOT / "data_snapshots" / "signals").mkdir(parents=True, exist_ok=True)
     (ROOT / "data_snapshots" / "signals" / "latest.json").write_text(

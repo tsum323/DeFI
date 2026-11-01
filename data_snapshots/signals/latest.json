@@ -4,7 +4,7 @@
  "snapshot": {
   "block": 26321343,
   "timestamp": 1793553227,
-  "data_age_seconds": 1148,
+  "data_age_seconds": 1386,
   "sqrt_price": "2213051247629614158610587675202",
   "tick": 66599,
   "price": 78023.20292222078,
@@ -31,7 +31,7 @@
  },
  "payload": {
   "type": "WAIT",
-  "created_at": 1793554375,
+  "created_at": 1793554613,
   "block": 26321343,
   "pool": "wbtc_usdc_3000",
   "pair": "WBTC/USDC",

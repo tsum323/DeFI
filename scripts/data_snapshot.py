@@ -1,4 +1,4 @@
-"""Save / restore the synced pool data as compressed files inside the repo.
+"""Save / restore the synced pool data and the research state as compressed files in the repo.
 
   python -m scripts.data_snapshot export   [--pool wbtc_usdc_3000]
   python -m scripts.data_snapshot restore  [--pool wbtc_usdc_3000]
@@ -18,6 +18,7 @@ from pathlib import Path
 
 from backend.core.config import load_config
 from backend.data_engine.snapshot import export_pool, restore_pool
+from backend.database.research_snapshot import export_research, restore_research
 from backend.database import schema as S
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -29,7 +30,7 @@ SIDE_FILES = ("pool_verification.json", "fee_tier_comparison.json", "gas_calibra
 def main() -> None:
     cfg = load_config()
     ap = argparse.ArgumentParser()
-    ap.add_argument("action", choices=["export", "restore"])
+    ap.add_argument("action", choices=["export", "restore", "export-research", "restore-research"])
     ap.add_argument("--pool", default=cfg.primary_pool)
     args = ap.parse_args()
     p = cfg.pools[args.pool]
@@ -37,6 +38,15 @@ def main() -> None:
     snap = ROOT / "data_snapshots" / args.pool
     engine = S.make_engine(cfg.lab["database"]["url"])
     t0 = time.monotonic()
+    research_dir = ROOT / "data_snapshots" / "research_db"
+    optuna_db = ROOT / "data" / "optuna.sqlite"
+    if args.action == "export-research":
+        m = export_research(engine, research_dir, optuna_db)
+        print({k: v["rows"] for k, v in m["tables"].items()})
+        return
+    if args.action == "restore-research":
+        print(restore_research(engine, research_dir, optuna_db))
+        return
     if args.action == "export":
         m = export_pool(engine, chain_id, p.address, snap)
         for name in SIDE_FILES:

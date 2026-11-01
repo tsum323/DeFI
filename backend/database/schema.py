@@ -215,6 +215,56 @@ market_evaluations = Table(  # every evaluation, including ones that changed not
 )
 
 
+# ------------------------------------------------------------ virtual portfolio
+virtual_positions = Table(  # parameters are written once, never changed (SPEC 12)
+    "virtual_positions", metadata,
+    Column("id", Integer, primary_key=True, autoincrement=True),
+    Column("signal_id", Integer, nullable=False, unique=True),
+    Column("created_at", BigInteger, nullable=False),
+    Column("open_block", BigInteger, nullable=False),
+    Column("spec_hash", String(64), nullable=False),
+    Column("params_json", Text, nullable=False),
+    Column("capital_token1", Text, nullable=False),
+    Column("valid_until", BigInteger, nullable=False),
+    Column("signal_payload_sha256", String(64), nullable=False),  # immutability check
+    Column("opening_json", Text, nullable=False),  # range + amounts promised by the signal
+)
+
+virtual_marks = Table(  # derived: recomputed from the immutable parameters and exact data
+    "virtual_marks", metadata,
+    Column("position_id", Integer, primary_key=True),
+    Column("block", BigInteger, primary_key=True),
+    Column("timestamp", BigInteger, nullable=False),
+    Column("mark_json", Text, nullable=False),
+)
+
+virtual_results = Table(  # latest state of every position (one row per position)
+    "virtual_results", metadata,
+    Column("position_id", Integer, primary_key=True),
+    Column("status", String(16), nullable=False),     # open | closed
+    Column("close_block", BigInteger),
+    Column("close_reason", Text),
+    Column("outcome", String(16)),                    # success | failure (closed only)
+    Column("last_block", BigInteger, nullable=False),
+    Column("result_json", Text, nullable=False),
+    Column("updated_at", BigInteger, nullable=False),
+)
+
+
+forward_tests = Table(  # candidates watched on data that did not exist when they were chosen
+    "forward_tests", metadata,
+    Column("id", Integer, primary_key=True, autoincrement=True),
+    Column("created_at", BigInteger, nullable=False),
+    Column("start_block", BigInteger, nullable=False),
+    Column("spec_hash", String(64), nullable=False),
+    Column("params_json", Text, nullable=False),
+    Column("capital_token1", Text, nullable=False),
+    Column("reason", Text, nullable=False),
+    Column("result_json", Text),
+    Column("updated_at", BigInteger),
+)
+
+
 def big_int_columns(spec: EventSpec) -> set[str]:
     t = event_tables.get(spec.table, pool_created_table)
     return {n for n, typ, _ in spec.fields
@@ -246,4 +296,5 @@ def make_engine(url: str) -> Engine:
 __all__ = ["metadata", "pools", "blocks", "raw_logs", "sync_state", "sync_gaps",
            "event_tables", "pool_created_table", "strategies", "datasets", "experiments",
            "validation_reports", "hypotheses", "hypothesis_experiments", "signals", "signal_events",
-           "market_evaluations", "make_engine"]
+           "market_evaluations", "virtual_positions", "virtual_marks",
+           "virtual_results", "forward_tests", "make_engine"]

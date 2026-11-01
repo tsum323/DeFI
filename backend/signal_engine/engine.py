@@ -217,6 +217,7 @@ def build_open_candidate(ds: Dataset, state: PoolState, snap: MarketSnapshot, ca
     return {
         "type": "OPEN CANDIDATE", "created_at": now_ts, "block": state.block, **pool_meta,
         "current_price": snap.price, "strategy": cand.params.name, "spec_hash": cand.params.spec_hash,
+        "capital_token1": str(capital),
         "params": asdict(cand.params),
         "range": {"tick_lower": lower, "tick_upper": upper,
                   "price_lower": human_price(sa, d0, d1), "price_upper": human_price(sb, d0, d1)},
