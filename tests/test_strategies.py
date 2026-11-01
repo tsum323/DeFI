@@ -78,3 +78,15 @@ def test_research_snapshot_roundtrip(tmp_path):
 
 
 SMALL = {"width_pct": [0.05, 0.3], "rules": [{"rebalance": "none"}], "ratio_token1": [None]}
+
+
+def test_research_restore_without_optuna_file(tmp_path):
+    from backend.database.research_snapshot import export_research, restore_research
+    a = S.make_engine(f"sqlite:///{tmp_path / 'a.sqlite'}")
+    fake_optuna = tmp_path / "optuna.sqlite"
+    fake_optuna.write_bytes(b"x")
+    export_research(a, tmp_path / "snap", fake_optuna)
+    (tmp_path / "snap" / "optuna.sqlite").unlink()  # as in a fresh git checkout
+    out = restore_research(S.make_engine(f"sqlite:///{tmp_path / 'b.sqlite'}"), tmp_path / "snap",
+                           tmp_path / "restored_optuna.sqlite")
+    assert "optuna" not in out and not (tmp_path / "restored_optuna.sqlite").exists()

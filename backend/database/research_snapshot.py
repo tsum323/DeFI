@@ -57,7 +57,9 @@ def restore_research(engine, src_dir: Path, optuna_db: Path | None = None) -> di
             for i in range(0, len(rows), 2000):
                 _insert_ignore(conn, t, rows[i:i + 2000])
             out[name] = len(rows)
-    if optuna_db is not None and manifest.get("optuna") and not optuna_db.exists():
+    # the Optuna study file is optional (git ignores *.sqlite); only needed for optimization
+    if (optuna_db is not None and manifest.get("optuna") and not optuna_db.exists()
+            and (src_dir / manifest["optuna"]).exists()):
         optuna_db.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(src_dir / manifest["optuna"], optuna_db)
         out["optuna"] = "restored"
