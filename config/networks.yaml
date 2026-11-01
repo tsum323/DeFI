@@ -12,13 +12,9 @@ networks:
     block_time_seconds: 12          # post-Merge slot time; used only for estimates
     native_symbol: ETH
     rpc:
-      - name: user_rpc             # user-provided archive node (Alchemy/Infura/QuickNode/own node)
+      - name: alchemy              # user's Alchemy endpoint (archive); domain allowed in env settings
         url_env: ETH_RPC_URL
         archive: true
-      - name: alchemy_demo         # Alchemy's PUBLIC demo key: archive, but heavily rate-limited.
-        url: https://eth-mainnet.g.alchemy.com/v2/demo   # fallback for verification only
-        archive: true
-        min_interval_seconds: 1.0
       - name: publicnode
         url: https://ethereum-rpc.publicnode.com
         archive: false             # blocked by session network policy (403)

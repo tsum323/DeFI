@@ -105,7 +105,7 @@ def test_rpc_client_rejects_write_methods_before_network():
 
 def test_placeholder_url_detected_without_leaking():
     with pytest.raises(BadEndpointConfig) as ei:
-        RpcClient("user_rpc", "https://eth-mainnet.g.alchemy.com/v2/ВАШ_КЛЮЧ")
+        RpcClient("alchemy", "https://eth-mainnet.g.alchemy.com/v2/ВАШ_КЛЮЧ")
     assert "alchemy.com" not in str(ei.value) and "КЛЮЧ" not in str(ei.value)
     assert "SECRET" not in repr(RpcClient("x", "https://h/v2/SECRET"))
 
