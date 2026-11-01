@@ -16,7 +16,7 @@ import statistics
 import subprocess
 import sys
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from backend.backtesting.dataset import ROOT, cached_state_at, load_dataset
 from backend.core.config import load_config
@@ -31,6 +31,8 @@ from backend.virtual_portfolio.portfolio import journal, mark_all, open_new_posi
 TYPE_RU = {"OPEN CANDIDATE": "КАНДИДАТ НА ОТКРЫТИЕ", "WAIT": "ЖДАТЬ", "HOLD": "ДЕРЖАТЬ",
            "REBALANCE": "ПЕРЕСТАВИТЬ ДИАПАЗОН", "CLOSE CANDIDATE": "КАНДИДАТ НА ЗАКРЫТИЕ",
            "INVALIDATED": "СИГНАЛ ОТМЕНЁН"}
+
+MSK = timezone(timedelta(hours=3), "МСК")  # Moscow time, UTC+3 all year
 
 
 def main() -> None:
@@ -57,9 +59,9 @@ def main() -> None:
             "pool_address": p.address, "fee_tier": p.fee / 1e6}
     d = evaluate_market(engine, ds, state, snap, table, load_strategies(engine), study, sc, meta,
                         lambda b: cached_state_at(ds, b), now)
-    when = datetime.fromtimestamp(snap.timestamp, timezone.utc)
+    when = datetime.fromtimestamp(snap.timestamp, MSK)
     print(f"\n{meta['pair']} {meta['fee_tier']:.2%} ({meta['network']}), блок {snap.block} "
-          f"({when:%Y-%m-%d %H:%M} UTC, данные {snap.data_age_seconds // 60} мин назад)")
+          f"({when:%Y-%m-%d %H:%M} МСК, данные {snap.data_age_seconds // 60} мин назад)")
     print(f"цена {snap.price:,.0f} USDC · волатильность 7д {(snap.vol_7d or 0):.0%} · "
           f"изменение 30д {(snap.change_30d or 0):+.1%} · режим {snap.trend}/{snap.vol_class} · "
           f"объём 24ч ${snap.volume_24h_usd:,.0f} · TVL ${snap.tvl_usd:,.0f} · "
@@ -77,7 +79,7 @@ def main() -> None:
               f"${pl['expected_fees_usd'][1]:,.2f}; расходы ${pl['expected_costs_usd']['total']:,.2f}")
         print(f"  прогноз чистого результата при ±1σ цены: ${pl['net_forecast_usd'][0]:,.0f} – "
               f"${pl['net_forecast_usd'][1]:,.0f}; макс. историческая просадка {pl['historical']['max_drawdown']:.0%}")
-        print(f"  действует до {datetime.fromtimestamp(pl['valid_until'], timezone.utc):%Y-%m-%d %H:%M} UTC")
+        print(f"  действует до {datetime.fromtimestamp(pl['valid_until'], MSK):%Y-%m-%d %H:%M} МСК")
     elif d.decision == "WAIT":
         for x in pl.get("reasons", []):
             print(f"  причина: {x['name']} — {x['value']} (нужно {x['threshold']})")

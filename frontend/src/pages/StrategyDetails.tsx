@@ -2,7 +2,7 @@ import { useParams } from "react-router-dom";
 import { Chart } from "../components/Chart";
 import { Card, Loading, Pill, Stat } from "../components/ui";
 import { useApi } from "../components/useApi";
-import { day, pct, pctAbs, sign, usd } from "../format";
+import { day, msk, pct, pctAbs, sign, usd } from "../format";
 
 interface Point { t: number; price: number; value_lp: number; value_hodl: number; fees_a: number; fees_b: number;
   net_a: number; gas: number; in_range: boolean; token0: number; token1: number }
@@ -15,7 +15,7 @@ interface Details {
   series: { points: Point[]; actions: Action[]; metrics: Record<string, number | boolean | null>; note: string } | null;
 }
 
-const ts = (t: number) => new Date(t * 1000);
+const ts = (t: number) => msk(t); // chart axes in Moscow time
 
 export default function StrategyDetailsPage() {
   const { hash } = useParams();

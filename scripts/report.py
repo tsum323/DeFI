@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import select
 
@@ -12,9 +12,11 @@ from backend.backtesting.dataset import ROOT
 from backend.core.config import load_config
 from backend.database import schema as S
 
+MSK = timezone(timedelta(hours=3), "МСК")  # Moscow time, UTC+3 all year
+
 
 def _t(ts):
-    return datetime.fromtimestamp(ts, timezone.utc).strftime("%Y-%m-%d %H:%M UTC") if ts else "—"
+    return datetime.fromtimestamp(ts, MSK).strftime("%Y-%m-%d %H:%M МСК") if ts else "—"
 
 
 def _p(x, d=2):
@@ -72,7 +74,7 @@ def main() -> None:
         L.append(f"- {_t(r.started_at)} {r.job} ({r.trigger}): {r.status}")
     out = ROOT / "data_snapshots" / "reports"
     out.mkdir(parents=True, exist_ok=True)
-    path = out / f"report_{datetime.fromtimestamp(now, timezone.utc):%Y-%m-%d}.md"
+    path = out / f"report_{datetime.fromtimestamp(now, MSK):%Y-%m-%d}.md"
     path.write_text("\n".join(L) + "\n")
     print(f"written {path.relative_to(ROOT)}")
 
