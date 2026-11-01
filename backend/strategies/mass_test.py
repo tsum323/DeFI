@@ -25,16 +25,62 @@ from backend.strategies.generator import StrategyParams
 ROOT = Path(__file__).resolve().parents[2]
 
 
-def code_version() -> str:
-    """git HEAD (+ '-dirty' if backend/ has uncommitted changes)."""
+# Code that determines backtest results. Edits elsewhere (optimizer, scripts, docs,
+# scoring) do not invalidate stored experiments.
+RESULT_PATHS = ("backend/backtesting", "backend/strategies/generator.py", "backend/analytics",
+                "backend/core", "backend/validation/segments.py")
+
+
+def _git(*args: str) -> str:
+    return subprocess.check_output(["git", *args], cwd=ROOT, text=True).strip()
+
+
+def code_version(rev: str = "HEAD") -> str:
+    """Hash of the git objects of RESULT_PATHS at `rev` (+ '-dirty' if they have
+    uncommitted changes and rev is HEAD)."""
     try:
-        head = subprocess.check_output(["git", "rev-parse", "--short=12", "HEAD"], cwd=ROOT,
-                                       text=True).strip()
-        dirty = subprocess.run(["git", "diff", "--quiet", "HEAD", "--", "backend", "config"],
-                               cwd=ROOT).returncode != 0
-        return head + ("-dirty" if dirty else "")
+        ids = [_git("rev-parse", f"{rev}:{p}") for p in RESULT_PATHS]
+        version = "sim-" + hashlib.sha256(" ".join(ids).encode()).hexdigest()[:12]
+        if rev == "HEAD" and subprocess.run(["git", "diff", "--quiet", "HEAD", "--", *RESULT_PATHS],
+                                            cwd=ROOT).returncode != 0:
+            version += "-dirty"
+        return version
     except (OSError, subprocess.CalledProcessError):
         return "unknown"
+
+
+def relabel_commit_versions(engine) -> dict:
+    """Older rows were labelled with a commit hash. Relabel them to the result-code
+    version when that commit's RESULT_PATHS are identical to it (checked by git);
+    rows whose code differs keep their label and are recomputed if needed."""
+    out = {}
+    with engine.begin() as conn:
+        labels = [v for v in conn.execute(select(S.experiments.c.code_version).distinct()).scalars()
+                  if v and not v.startswith("sim-") and not v.endswith("-dirty") and v != "unknown"]
+        for old in labels:
+            try:
+                new = code_version(old)
+            except Exception:  # noqa: BLE001 - unknown commit
+                continue
+            if new == "unknown":
+                continue
+            rows = conn.execute(select(S.experiments.c.id, S.experiments.c.spec_hash,
+                                       S.experiments.c.dataset_hash)
+                                .where(S.experiments.c.code_version == old)).all()
+            existing = set(conn.execute(select(S.experiments.c.dedup_key).where(
+                S.experiments.c.code_version == new)).scalars())
+            n = 0
+            for rid, sh, dh in rows:
+                key = _hash([sh, dh, new])
+                if key in existing:
+                    conn.execute(S.experiments.delete().where(S.experiments.c.id == rid))
+                    continue
+                conn.execute(S.experiments.update().where(S.experiments.c.id == rid)
+                             .values(code_version=new, dedup_key=key))
+                existing.add(key)
+                n += 1
+            out[old] = (new, n)
+    return out
 
 
 def dataset_descriptor(ds: Dataset, pool_key: str, address: str, start: int, end: int,

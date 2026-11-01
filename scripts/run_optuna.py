@@ -22,7 +22,7 @@ from backend.core.config import load_config
 from backend.database import schema as S
 from backend.optimizer.optuna_study import best_params, optimize
 from backend.strategies.generator import BASE_STRATEGIES
-from backend.strategies.mass_test import code_version, dataset_descriptor
+from backend.strategies.mass_test import dataset_descriptor, relabel_commit_versions
 from backend.validation.robustness import score_strategies
 from backend.validation.segments import load_segment_table, make_segments, run_segment_table
 
@@ -54,6 +54,7 @@ def main() -> None:
     base.pop("from_block"), base.pop("to_block")
     base["segment_days"] = args.segment_days
     engine = S.make_engine(cfg.lab["database"]["url"])
+    relabel_commit_versions(engine)
     print(f"optimizing on {sum(s.role == 'IS' for s in segs)} IS segments; OOS hidden", flush=True)
     study = optimize(engine, ds, segs, base, n_trials=args.trials, batch=args.batch, seed=args.seed,
                      progress=lambda d, n, v, name: print(
@@ -63,10 +64,10 @@ def main() -> None:
     passive = BASE_STRATEGIES["passive_full_range"]
     cands = top + [passive]
     print(f"\nrevealing OOS once for the top {len(top)} trials ...", flush=True)
-    run_segment_table(engine, ds, cands, segs, base, batch=len(cands))
-    table = load_segment_table(engine, base, segs)
+    stats = run_segment_table(engine, ds, cands, segs, base, batch=len(cands))
+    version = stats["code_version"]
+    table = load_segment_table(engine, base, segs, version)
     reports = {r.spec_hash: r for r in score_strategies(table, cands, segs)}
-    version = code_version()
     key = "optuna:" + study.study_name
     with engine.begin() as conn:
         conn.execute(S.validation_reports.delete().where(S.validation_reports.c.study_key == key))

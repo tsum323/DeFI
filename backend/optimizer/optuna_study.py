@@ -98,9 +98,9 @@ def optimize(engine, ds, segments: list[Segment], base_descriptor: dict, *, n_tr
             t.set_user_attr("spec_hash", p.spec_hash)
             t.set_user_attr("name", p.name)
         uniq = list({p.spec_hash: p for p in params}.values())
-        run_segment_table(engine, ds, uniq, is_segments, base_descriptor, variants_is=("base",),
-                          variants_oos=(), batch=len(uniq))
-        table = load_segment_table(engine, base_descriptor, is_segments)
+        st = run_segment_table(engine, ds, uniq, is_segments, base_descriptor, variants_is=("base",),
+                               variants_oos=(), batch=len(uniq))
+        table = load_segment_table(engine, base_descriptor, is_segments, st["code_version"])
         for t, p in zip(trials, params):
             study.tell(t, is_objective(table, p.spec_hash, is_segments))
         done += k

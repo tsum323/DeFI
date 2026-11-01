@@ -23,7 +23,7 @@ from backend.backtesting.dataset import ROOT, load_dataset
 from backend.core.config import load_config
 from backend.database import schema as S
 from backend.strategies.generator import DEFAULT_SPACE, SMALL_SPACE, generate
-from backend.strategies.mass_test import _hash, code_version, dataset_descriptor
+from backend.strategies.mass_test import _hash, dataset_descriptor, relabel_commit_versions
 from backend.validation.robustness import score_strategies, walk_forward
 from backend.validation.segments import load_segment_table, make_segments, run_segment_table
 
@@ -56,6 +56,9 @@ def main() -> None:
     base.pop("from_block"), base.pop("to_block")
     base["segment_days"] = args.segment_days
     engine = S.make_engine(cfg.lab["database"]["url"])
+    relabeled = relabel_commit_versions(engine)
+    if relabeled:
+        print("relabeled stored experiments:", relabeled)
     print(f"{len(segs)} segments x {args.segment_days}d ({sum(s.role == 'OOS' for s in segs)} OOS), "
           f"{len(params)} strategies", flush=True)
     for s in segs:
@@ -65,10 +68,10 @@ def main() -> None:
                               progress=lambda d, n: print(f"  pass {d}/{n} strategies "
                                                           f"{time.monotonic() - t0:.0f}s", flush=True))
     print(stats, flush=True)
-    table = load_segment_table(engine, base, segs)
+    version = stats["code_version"]  # the version the table was computed with
+    table = load_segment_table(engine, base, segs, version)
     reports = score_strategies(table, params, segs, space)
     wf = walk_forward(table, params, segs)
-    version = code_version()
     study_key = _hash([base, [asdict(s) for s in segs], sorted(x.spec_hash for x in params), version])
     now = int(time.time())
     with engine.begin() as conn:
