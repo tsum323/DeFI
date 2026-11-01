@@ -150,7 +150,19 @@ def evaluate_strategy(table: dict, p: StrategyParams, study: Study) -> dict:
         ex.append(_roi(m) - _roi(pm))
         if mg is not None and pg is not None:
             ex_gas.append(_roi(mg) - _roi(pg))
+    is_ex = []
+    for s in study.segments:
+        if s.role != "IS":
+            continue
+        m, pm = table.get((p.spec_hash, s.index, "base")), table.get((PASSIVE, s.index, "base"))
+        if m is not None and pm is not None:
+            is_ex.append(_roi(m) - _roi(pm))
     out = {"strategy": p.name, "spec_hash": p.spec_hash, "oos_segments": len(oos), "missing": missing,
+           # IS context (not part of the verdict): does the edge also exist in-sample?
+           "is_mean_excess": _r(statistics.fmean(is_ex)) if is_ex else None,
+           "is_positive_excess_segments": sum(x > 0 for x in is_ex), "is_segments": len(is_ex),
+           "consistent_with_is": bool(is_ex) and statistics.fmean(is_ex) > 0
+           and sum(x > 0 for x in is_ex) * 2 >= len(is_ex),
            "oos_excess_vs_passive": [_r(x) for x in ex], "oos_roi": [_r(x) for x in rois],
            "mean_excess": _r(statistics.fmean(ex)) if ex else None,
            "positive_excess_segments": sum(x > 0 for x in ex),
@@ -238,6 +250,7 @@ def run_cycle(engine, ds, study: Study, adapter, grid_params: list[StrategyParam
                     "status": r["status"], "verdict": r.get("verdict"), "confidence": r.get("confidence"),
                     "conclusion": r.get("conclusion"), "strategies": r.get("results", []),
                     "invalid_reasons": r["invalid_reasons"]} for r in records]
+    oos_seen = bool(getattr(adapter, "oos_seen", False))
     commentary = None
     if any(r["status"] == "tested" for r in records):
         commentary = adapter.comment(SYSTEM_COMMENT, json.dumps(
@@ -252,7 +265,8 @@ def run_cycle(engine, ds, study: Study, adapter, grid_params: list[StrategyParam
                 test_plan=d.test_plan, expected_outcome=d.expected_outcome, status=r["status"],
                 verdict=r.get("verdict"), confidence=r.get("confidence"),
                 result_json=json.dumps({"strategies": r.get("results", []),
-                                        "invalid_reasons": r["invalid_reasons"]}),
+                                        "invalid_reasons": r["invalid_reasons"],
+                                        "oos_contaminated": oos_seen}),
                 conclusion=r.get("conclusion"),
                 ai_commentary=commentary.model_dump_json() if commentary else None,
                 created_by_model=adapter.model, code_version=version)).inserted_primary_key[0]
@@ -261,7 +275,8 @@ def run_cycle(engine, ds, study: Study, adapter, grid_params: list[StrategyParam
     summary = {"cycle_id": cycle_id, "model": adapter.model, "code_version": version,
                "proposed": len(records), "tested": sum(r["status"] == "tested" for r in records),
                "confirmed": sum(r.get("verdict") == "confirmed" for r in records),
-               "oos_reuse_before_cycle": prior_tests, "seconds": round(time.time() - t0, 1),
+               "oos_reuse_before_cycle": prior_tests, "oos_contaminated": oos_seen,
+               "seconds": round(time.time() - t0, 1),
                "hypotheses": results_doc,
                "commentary": commentary.model_dump() if commentary else None}
     if out_dir is not None:
@@ -272,14 +287,20 @@ def run_cycle(engine, ds, study: Study, adapter, grid_params: list[StrategyParam
 def write_report(summary: dict, out_dir: Path) -> Path:
     out_dir.mkdir(parents=True, exist_ok=True)
     (out_dir / f"cycle_{summary['cycle_id']}.json").write_text(json.dumps(summary, indent=1) + "\n")
+    seen = summary.get("oos_contaminated")
     lines = [f"# Цикл AI-исследования {summary['cycle_id']}", "",
              f"Модель: `{summary['model']}` · версия кода `{summary['code_version']}` · "
              f"гипотез: {summary['proposed']}, проверено: {summary['tested']}, "
              f"подтверждено: {summary['confirmed']}", "",
-             "Вердикты и цифры посчитаны Python на OOS-отрезках, которых модель не видела (MODELED). "
+             "Вердикты и цифры посчитаны Python на OOS-отрезках по заранее заданным правилам (MODELED); "
+             + ("автор гипотез эти отрезки уже видел. " if seen else "автор гипотез их не видел. ")
+             +
              f"До этого цикла на тех же OOS-данных уже проверено гипотез: "
              f"{summary['oos_reuse_before_cycle']} — чем больше проверок, тем выше шанс случайного "
              "«подтверждения»; подтверждённое требует проверки на новых данных (этапы 8–9).", ""]
+    if summary.get("oos_contaminated"):
+        lines += ["> **OOS-проверка не чистая:** автор гипотез уже видел OOS-результаты до их "
+                  "написания. Вердикты ниже — справочные; «подтверждено» здесь не доказательство.", ""]
     for h in summary["hypotheses"]:
         lines += [f"## {h['title']}", "", h["description"], "",
                   f"**Статус:** {h['status']} · **вердикт:** {h['verdict'] or '—'} · "
@@ -292,7 +313,11 @@ def write_report(summary: dict, out_dir: Path) -> Path:
                          f"{'n/a' if me is None else f'{me:+.2%}'} за OOS-отрезок, лучше в "
                          f"{s['positive_excess_segments']}/{s['oos_segments']}, газ×2: "
                          f"{'n/a' if s['mean_excess_gas_x2'] is None else format(s['mean_excess_gas_x2'], '+.2%')}"
-                         f"{', разорение' if s['ruined'] else ''} → {s['verdict']}")
+                         f"{', разорение' if s['ruined'] else ''} → {s['verdict']}"
+                         + ("" if s.get("is_mean_excess") is None else
+                            f"; на IS: {s['is_mean_excess']:+.2%}, лучше в "
+                            f"{s['is_positive_excess_segments']}/{s['is_segments']}"
+                            + ("" if s.get("consistent_with_is") else " — **на IS преимущества нет**")))
         for why in h["invalid_reasons"]:
             lines.append(f"- отклонено при проверке параметров: {why}")
         lines.append("")
@@ -307,3 +332,20 @@ def write_report(summary: dict, out_dir: Path) -> Path:
     path = out_dir / f"cycle_{summary['cycle_id']}.md"
     path.write_text("\n".join(lines) + "\n")
     return path
+
+
+def attach_commentary(engine, cycle_id: str, commentary, out_dir: Path | None = None) -> dict:
+    """Attach a commentary (Commentary schema) written after the results to a stored cycle."""
+    with engine.begin() as conn:
+        n = conn.execute(S.hypotheses.update().where(S.hypotheses.c.cycle_id == cycle_id)
+                         .values(ai_commentary=commentary.model_dump_json())).rowcount
+    if not n:
+        raise ValueError(f"no hypotheses for cycle {cycle_id}")
+    summary = None
+    if out_dir is not None:
+        path = out_dir / f"cycle_{cycle_id}.json"
+        if path.exists():
+            summary = json.loads(path.read_text())
+            summary["commentary"] = commentary.model_dump()
+            write_report(summary, out_dir)
+    return {"cycle_id": cycle_id, "rows": n, "report_updated": summary is not None}

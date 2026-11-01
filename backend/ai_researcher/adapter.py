@@ -67,3 +67,22 @@ class AnthropicAdapter:
 
     def comment(self, system: str, results: str) -> Commentary:
         return self._parse(system, results, Commentary)
+
+
+class FileAdapter:
+    """Hypotheses written by a person or an in-session assistant into a JSON file
+    (HypothesisBatch schema). No API call. `oos_seen` must be True when the author has
+    already seen out-of-sample results: verdicts are then flagged as contaminated."""
+
+    def __init__(self, hypotheses_path, model: str, oos_seen: bool):
+        from pathlib import Path
+        self.path, self.model, self.oos_seen = Path(hypotheses_path), model, oos_seen
+
+    def propose(self, system: str, context: str, n: int) -> HypothesisBatch:
+        try:
+            return HypothesisBatch.model_validate_json(self.path.read_text())
+        except Exception as exc:  # noqa: BLE001 - surface schema errors to the user
+            raise LLMError(f"{self.path}: not a valid hypothesis batch: {exc}") from exc
+
+    def comment(self, system: str, results: str):
+        return None  # commentary is attached later (scripts.run_research --attach-commentary)

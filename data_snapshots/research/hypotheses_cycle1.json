@@ -1,0 +1,42 @@
+{"hypotheses": [
+ {"title": "Фильтр волатильности защищает широкий диапазон в обвалах",
+  "description": "Широкий статичный диапазон, который закрывается, когда недельная волатильность выше порога, и открывается снова после успокоения, теряет меньше в режимах down/high при почти той же доходности в остальных.",
+  "rationale": "В IS все стратегии сильнее всего теряют в режиме down/high (например, w0.5_r1=0.3_static: -0.356 в down/high против +0.227 в up/high). Широкие статичные диапазоны лучше остальных по inner OOS, поэтому проверяем фильтр поверх них.",
+  "strategies": [
+   {"width_pct": 0.5, "rebalance": "none", "rebalance_delay_blocks": 0, "period_days": 0, "edge_fraction": 1.0, "cooldown_hours": 0, "ratio_token1": null, "full_range": false, "width_vol_mult": null, "max_vol_entry": 0.9, "vol_lookback_days": 7},
+   {"width_pct": 1.0, "rebalance": "none", "rebalance_delay_blocks": 0, "period_days": 0, "edge_fraction": 1.0, "cooldown_hours": 0, "ratio_token1": null, "full_range": false, "width_vol_mult": null, "max_vol_entry": 0.9, "vol_lookback_days": 7}],
+  "test_plan": "Сравнить с пассивным LP на OOS; контроль — те же ширины без фильтра (w0.5_static, w1_static) из сетки.",
+  "expected_outcome": "Подтверждение: превышение над пассивным LP > 0 в >= 5 из 7 OOS-отрезков и при газе x2. Опровержение: фильтр чаще выводит из рынка перед ростом, чем перед падением."},
+ {"title": "Ширина по волатильности при редких перестановках",
+  "description": "Если ширину диапазона задавать кратной недельной волатильности и переставлять только после суток вне диапазона с охлаждением 3 дня, позиция реже выходит из диапазона и меньше платит за перестановки, чем фиксированная ширина.",
+  "rationale": "В IS перестановка при выходе с задержкой 1 день (w0.3_exit_d7200) близка к лучшим по inner score, а частые правила (edge, periodic) в среднем хуже пассивного LP на -0.33 и -0.17. Фиксированная ширина не учитывает, что волатильность в IS менялась от 0.46 до 0.75.",
+  "strategies": [
+   {"width_pct": 0.3, "rebalance": "on_exit", "rebalance_delay_blocks": 7200, "period_days": 0, "edge_fraction": 1.0, "cooldown_hours": 72, "ratio_token1": null, "full_range": false, "width_vol_mult": 2.0, "max_vol_entry": null, "vol_lookback_days": 14},
+   {"width_pct": 0.3, "rebalance": "on_exit", "rebalance_delay_blocks": 7200, "period_days": 0, "edge_fraction": 1.0, "cooldown_hours": 72, "ratio_token1": null, "full_range": false, "width_vol_mult": 4.0, "max_vol_entry": null, "vol_lookback_days": 14}],
+  "test_plan": "Сравнить с пассивным LP и с w0.3_exit_d7200 (фиксированная ширина) на OOS.",
+  "expected_outcome": "Подтверждение по общим правилам; для идеи важно, чтобы хотя бы один множитель был не хуже фиксированной ширины."},
+ {"title": "Умеренный перекос в WBTC при очень широком диапазоне",
+  "description": "Очень широкий диапазон с умеренным перекосом в WBTC (доля USDC 0.4) и редкой перестановкой даёт результат лучше пассивного LP без сильной зависимости от направления цены.",
+  "rationale": "В IS лидеры по inner score — широкие диапазоны с r1=0.3 (w0.5_r1=0.3, w1_r1=0.3: inner OOS к пассивному около +0.05), но среди всех стратегий r1=0.3 и r1=0.7 различаются сильно, т.е. перекос — ставка на направление. Проверяем более мягкий перекос 0.4–0.45.",
+  "strategies": [
+   {"width_pct": 0.75, "rebalance": "on_exit", "rebalance_delay_blocks": 7200, "period_days": 0, "edge_fraction": 1.0, "cooldown_hours": 24, "ratio_token1": 0.4, "full_range": false, "width_vol_mult": null, "max_vol_entry": null, "vol_lookback_days": 7},
+   {"width_pct": 1.5, "rebalance": "none", "rebalance_delay_blocks": 0, "period_days": 0, "edge_fraction": 1.0, "cooldown_hours": 0, "ratio_token1": 0.45, "full_range": false, "width_vol_mult": null, "max_vol_entry": null, "vol_lookback_days": 7}],
+  "test_plan": "Сравнить с пассивным LP на OOS.",
+  "expected_outcome": "Подтверждение по общим правилам. Опровержение: при падении цены в OOS перекос в WBTC даёт отставание."},
+ {"title": "Поздний край и длинное охлаждение исправляют правило edge",
+  "description": "Правило edge плохо из-за частых перестановок; если срабатывать почти у границы (0.95), только после суток и не чаще раза в 3 дня, оно станет не хуже статичного диапазона.",
+  "rationale": "В IS правило edge в среднем хуже пассивного LP на -0.33 за отрезок — худшее из правил, при этом статичные диапазоны лучше всех (-0.04). Разница может объясняться числом перестановок, которое ограничивают задержка и охлаждение.",
+  "strategies": [
+   {"width_pct": 0.3, "rebalance": "edge", "rebalance_delay_blocks": 7200, "period_days": 0, "edge_fraction": 0.95, "cooldown_hours": 72, "ratio_token1": null, "full_range": false, "width_vol_mult": null, "max_vol_entry": null, "vol_lookback_days": 7},
+   {"width_pct": 0.5, "rebalance": "edge", "rebalance_delay_blocks": 7200, "period_days": 0, "edge_fraction": 0.95, "cooldown_hours": 72, "ratio_token1": null, "full_range": false, "width_vol_mult": null, "max_vol_entry": null, "vol_lookback_days": 7}],
+  "test_plan": "Сравнить с пассивным LP и со статичными w0.3/w0.5 на OOS.",
+  "expected_outcome": "Подтверждение по общим правилам; для идеи достаточно не уступать статичному диапазону той же ширины."},
+ {"title": "Редкая периодическая перестановка широкого диапазона",
+  "description": "Периодическая перестановка раз в 45–60 дней с широким диапазоном удерживает цену в диапазоне дольше статичного и при этом почти не тратит на газ.",
+  "rationale": "В сетке периодические правила проверены только с периодом до 30 дней и в среднем хуже пассивного LP на -0.17; самые частые — хуже всего. Проверяем, сохраняется ли вред при очень редкой перестановке.",
+  "strategies": [
+   {"width_pct": 0.5, "rebalance": "periodic", "rebalance_delay_blocks": 0, "period_days": 60, "edge_fraction": 1.0, "cooldown_hours": 0, "ratio_token1": null, "full_range": false, "width_vol_mult": null, "max_vol_entry": null, "vol_lookback_days": 7},
+   {"width_pct": 0.3, "rebalance": "periodic", "rebalance_delay_blocks": 0, "period_days": 45, "edge_fraction": 1.0, "cooldown_hours": 0, "ratio_token1": null, "full_range": false, "width_vol_mult": null, "max_vol_entry": null, "vol_lookback_days": 7}],
+  "test_plan": "Сравнить с пассивным LP и со статичными w0.3/w0.5 на OOS.",
+  "expected_outcome": "Подтверждение по общим правилам. Опровержение: перестановка фиксирует непостоянные потери чаще, чем помогает."}
+]}
