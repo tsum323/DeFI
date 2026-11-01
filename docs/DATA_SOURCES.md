@@ -100,6 +100,7 @@ python -m scripts.backtest --from 2025-01-01 --to 2026-11-01 --width 0.10 --reba
 python -m scripts.run_grid --from 2025-01-01 --to 2026-11-01   # этап 5: массовый тест сетки стратегий
 python -m scripts.run_validation         # этап 6: IS/OOS, walk-forward, чувствительность, оценка устойчивости
 python -m scripts.run_optuna --trials 120   # этап 6: байесовская оптимизация (только IS), затем OOS
+python -m scripts.run_research --n 5     # этап 7: цикл AI-исследования (нужен ANTHROPIC_API_KEY)
 ```
 
 **Правило выбора основного fee tier:** основным становится пул с большей выручкой LP

@@ -150,6 +150,35 @@ validation_reports = Table(
 )
 
 
+# ------------------------------------------------------------ AI researcher
+hypotheses = Table(
+    "hypotheses", metadata,
+    Column("id", Integer, primary_key=True, autoincrement=True),
+    Column("cycle_id", String(64), nullable=False, index=True),
+    Column("created_at", BigInteger, nullable=False),
+    Column("title", Text, nullable=False),
+    Column("description", Text, nullable=False),
+    Column("rationale", Text, nullable=False),
+    Column("params_json", Text, nullable=False),       # list of strategy parameter sets
+    Column("test_plan", Text, nullable=False),
+    Column("expected_outcome", Text, nullable=False),
+    Column("status", String(24), nullable=False),      # proposed | invalid | duplicate | tested | failed
+    Column("verdict", String(16)),                     # confirmed | rejected | inconclusive
+    Column("confidence", String(8)),                   # low | medium | high (computed by Python)
+    Column("result_json", Text),                       # numbers computed by Python only
+    Column("conclusion", Text),                        # deterministic summary of the result
+    Column("ai_commentary", Text),                     # model-written analysis (no new numbers)
+    Column("created_by_model", String(64), nullable=False),
+    Column("code_version", String(64)),
+)
+
+hypothesis_experiments = Table(
+    "hypothesis_experiments", metadata,
+    Column("hypothesis_id", Integer, primary_key=True),
+    Column("spec_hash", String(64), primary_key=True),
+)
+
+
 def big_int_columns(spec: EventSpec) -> set[str]:
     t = event_tables.get(spec.table, pool_created_table)
     return {n for n, typ, _ in spec.fields
@@ -180,4 +209,4 @@ def make_engine(url: str) -> Engine:
 
 __all__ = ["metadata", "pools", "blocks", "raw_logs", "sync_state", "sync_gaps",
            "event_tables", "pool_created_table", "strategies", "datasets", "experiments",
-           "validation_reports", "make_engine"]
+           "validation_reports", "hypotheses", "hypothesis_experiments", "make_engine"]
