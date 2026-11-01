@@ -12,3 +12,4 @@ frontend/dist/
 *.sqlite
 *.db
 *.tsbuildinfo
+frontend/dist-static/

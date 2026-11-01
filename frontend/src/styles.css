@@ -70,3 +70,5 @@ ul { margin: 6px 0; padding-left: 18px; } li { margin: 3px 0; }
   .stat-value { font-size: 20px; } h1 { font-size: 20px; }
   .main { padding: 18px 16px 40px; } .grid.two { grid-template-columns: 1fr; }
 }
+.snapshot { border: 1px solid rgba(122,162,247,.35); background: rgba(122,162,247,.08); color: #c9d6fb;
+  padding: 8px 12px; border-radius: 10px; margin-bottom: 16px; font-size: 13px; }
