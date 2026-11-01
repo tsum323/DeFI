@@ -62,6 +62,7 @@ class Network(BaseModel):
     native_symbol: str
     rpc: list[dict]
     indexers: dict[str, dict]
+    oracles: dict[str, str] = {}
     uniswap_v3: UniswapV3Deployment
 
 

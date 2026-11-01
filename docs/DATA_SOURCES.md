@@ -92,6 +92,11 @@ python -m scripts.sync_pool --endpoint drpc   # история событий pr
 python -m scripts.data_snapshot export   # сохранить базу в data_snapshots/ для git
 python -m scripts.calibrate_gas          # газ по реальным receipts → data/gas_calibration.json
 python -m scripts.export_fixtures        # реальные логи для тестов → tests/fixtures/
+python -m scripts.fetch_eth_usd          # дневной ETH/USD (Chainlink) для газа → data/eth_usd_daily.json
+python -m scripts.validate_math_history  # этап 3: формулы против всей истории
+python -m scripts.verify_replay_checkpoints  # этап 4: состояние пула против eth_call
+python -m scripts.validate_fee_meter     # этап 4: комиссии против реальных позиций
+python -m scripts.backtest --from 2025-01-01 --to 2026-11-01 --width 0.10 --rebalance on_exit
 ```
 
 **Правило выбора основного fee tier:** основным становится пул с большей выручкой LP

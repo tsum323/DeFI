@@ -37,6 +37,9 @@ networks:
         dataset: bigquery-public-data.crypto_ethereum
         project_env: GCP_PROJECT
         role: bulk_backfill
+    oracles:
+      # Chainlink ETH/USD proxy; verified 2026-11-01: description() == "ETH / USD", decimals 8.
+      chainlink_eth_usd: "0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419"
     uniswap_v3:
       # Official Uniswap v3 deployment addresses on Ethereum mainnet.
       factory: "0x1F98431c8aD98523631AE4a59f267346ea31F984"
