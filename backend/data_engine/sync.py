@@ -204,8 +204,10 @@ def coverage_report(engine: Engine, chain_id: int, address: str) -> dict:
     with engine.connect() as conn:
         st = conn.execute(select(S.sync_state).where(
             S.sync_state.c.chain_id == chain_id, S.sync_state.c.address == address)).first()
+        # Decoded event rows store the address lower-cased (as returned by the node).
         counts = {name: conn.execute(select(func.count()).select_from(t).where(
-            t.c.address == address)).scalar_one() for name, t in S.event_tables.items()}
+            func.lower(t.c.address) == address.lower())).scalar_one()
+            for name, t in S.event_tables.items()}
         gaps = conn.execute(select(func.count()).select_from(S.sync_gaps).where(
             S.sync_gaps.c.address == address, S.sync_gaps.c.resolved.is_(False))).scalar_one()
     return {"start_block": st.start_block if st else None,

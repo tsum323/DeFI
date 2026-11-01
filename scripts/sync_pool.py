@@ -46,7 +46,8 @@ def main() -> None:
         raise SystemExit(f"{args.pool}: not verified on-chain — run python -m scripts.verify_pools")
     start = args.start_block if args.start_block is not None else ver["created_block"]
 
-    client = select_client(net, de)
+    # Historical ranges need an archive node; never fall back to a pruned one.
+    client = select_client(net, de, require_archive=True)
     head = client.block_number()
     safe = head - de["confirmations"]
     to_block = min(args.to_block or safe, safe)
