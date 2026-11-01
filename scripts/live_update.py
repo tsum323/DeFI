@@ -27,6 +27,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 MSK = timezone(timedelta(hours=3), "МСК")
 SITE_URL = "https://tsum323.github.io/DeFI/"
+LIVE_STATE = "state_cache/research_db"  # restored from / saved to the Actions cache
 TYPE_RU = {"OPEN CANDIDATE": "КАНДИДАТ НА ОТКРЫТИЕ", "WAIT": "ЖДАТЬ", "HOLD": "ДЕРЖАТЬ",
            "REBALANCE": "ПЕРЕСТАВИТЬ ДИАПАЗОН", "CLOSE CANDIDATE": "КАНДИДАТ НА ЗАКРЫТИЕ",
            "INVALIDATED": "СИГНАЛ ОТМЕНЁН"}
@@ -113,7 +114,11 @@ def main() -> None:
     for name in SIDE_FILES:
         if (snap / name).exists() and not (ROOT / "data" / name).exists():
             shutil.copy2(snap / name, ROOT / "data" / name)
-    run("scripts.data_snapshot", "restore-research")  # idempotent: merges the saved state
+    # idempotent merges: first the committed state (new experiments pushed from a session),
+    # then the live state kept in the Actions cache (signals, forward tests since the last commit)
+    run("scripts.data_snapshot", "restore-research")
+    if (ROOT / LIVE_STATE / "manifest.json").exists():
+        run("scripts.data_snapshot", "restore-research", "--research-dir", LIVE_STATE)
     engine = S.make_engine(cfg.lab["database"]["url"])
     before = latest_signal(engine)
     watch_before = watch_names(engine)

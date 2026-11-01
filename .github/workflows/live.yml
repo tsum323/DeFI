@@ -44,19 +44,35 @@ jobs:
           key: pooldb-v1-${{ steps.day.outputs.day }}
           restore-keys: pooldb-v1-
       # the small research state (signals, portfolio, forward tests): saved on every run
+      # (kept apart from the committed data_snapshots/research_db: both are merged)
       - uses: actions/cache/restore@v4
+        id: live_state
+        with:
+          path: state_cache/research_db
+          key: state-v2-${{ github.run_id }}
+          restore-keys: state-v2-
+      # one-time migration from the old cache layout (it lived in data_snapshots/research_db)
+      - uses: actions/cache/restore@v4
+        id: old_state
+        if: steps.live_state.outputs.cache-matched-key == ''
         with:
           path: data_snapshots/research_db
-          key: state-v1-${{ github.run_id }}
+          key: state-v1-none
           restore-keys: state-v1-
+      - if: steps.live_state.outputs.cache-matched-key == '' && steps.old_state.outputs.cache-matched-key != ''
+        run: |
+          mkdir -p state_cache && cp -r data_snapshots/research_db state_cache/
+          git checkout -- data_snapshots/research_db
       - name: Update data, signal, portfolio
         run: python -m scripts.live_update --out _site --notify-file notify.json
       - name: Save research state
-        run: python -m scripts.data_snapshot export-research
+        run: |
+          python -m scripts.data_snapshot export-research
+          rm -rf state_cache && mkdir -p state_cache && cp -r data_snapshots/research_db state_cache/
       - uses: actions/cache/save@v4
         with:
-          path: data_snapshots/research_db
-          key: state-v1-${{ github.run_id }}
+          path: state_cache/research_db
+          key: state-v2-${{ github.run_id }}
       - name: Notify on signal change
         env:
           GH_TOKEN: ${{ github.token }}

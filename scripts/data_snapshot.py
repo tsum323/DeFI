@@ -32,13 +32,15 @@ def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("action", choices=["export", "restore", "export-research", "restore-research"])
     ap.add_argument("--pool", default=cfg.primary_pool)
+    ap.add_argument("--research-dir", default="data_snapshots/research_db",
+                    help="research state directory (relative to the repo)")
     args = ap.parse_args()
     p = cfg.pools[args.pool]
     chain_id = cfg.networks[p.network].chain_id
     snap = ROOT / "data_snapshots" / args.pool
     engine = S.make_engine(cfg.lab["database"]["url"])
     t0 = time.monotonic()
-    research_dir = ROOT / "data_snapshots" / "research_db"
+    research_dir = ROOT / args.research_dir
     optuna_db = ROOT / "data" / "optuna.sqlite"
     if args.action == "export-research":
         m = export_research(engine, research_dir, optuna_db)

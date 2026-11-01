@@ -16,3 +16,4 @@ frontend/dist-static/
 _site/
 notify.json
 body.md
+state_cache/
