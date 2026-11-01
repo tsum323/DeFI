@@ -32,6 +32,7 @@ from backend.backtesting.pool_replay import PoolReplay, PoolState
 
 LONDON_BLOCK = 12_965_000
 GWEI = 10 ** 9
+RUIN_DIVISOR = 100  # principal below 1% of capital -> strategy stops ("ruined")
 
 
 class SimError(RuntimeError):
@@ -128,6 +129,7 @@ class _Sim:
         self.replay = replay
         self.last_open_ts = 0
         self.open_tick = 0
+        self.ruined_block: int | None = None
         self.gas = ds.gas_units[spec.gas_set]
         self.eth_blocks = [r[0] for r in ds.eth_usd]
         self.started = False
@@ -336,12 +338,16 @@ class _Sim:
             if self.pos and self.pos.tick_lower <= self.prev_tick < self.pos.tick_upper:
                 self.blocks_in_range += span
         self.last_block, self.prev_tick = block, s.tick
-        if spec.rebalance != "none" and self._should_rebalance(block, ts):
+        if self.pos is not None and spec.rebalance != "none" and self._should_rebalance(block, ts):
             il = self._close()
             self.il_realized += il
-            self._open(block, "rebalance", self.gas["decrease_liquidity_and_collect"]
-                       + self.gas["mint_new_position"])
-            self.actions[-1].il_realized_token1 = il
+            if _value1(self.x, self.y, s.sqrt_price) < spec.capital_token1 // RUIN_DIVISOR:
+                # principal destroyed (swap fees / IL): stop instead of minting dust
+                self.ruined_block = block
+            else:
+                self._open(block, "rebalance", self.gas["decrease_liquidity_and_collect"]
+                           + self.gas["mint_new_position"])
+                self.actions[-1].il_realized_token1 = il
             self.trigger_since = None
         if ts >= self.next_mark:
             self.series.append(self._mark(block, ts))
@@ -404,6 +410,7 @@ class _Sim:
             "max_drawdown_a": mdd,
             "time_in_range": self.blocks_in_range / self.blocks_total if self.blocks_total else 1.0,
             "rebalances": sum(a.kind == "rebalance" for a in self.actions),
+            "ruined": self.ruined_block is not None, "ruined_block": self.ruined_block,
             "max_liquidity_share": self.max_share,
             "size_impact": self.max_share > 0.01,
         }

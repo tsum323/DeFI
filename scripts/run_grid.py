@@ -61,8 +61,8 @@ def main() -> None:
     usd = 10 ** ds.decimals1
     rows.sort(key=lambda r: -r["metrics"]["net_a"])
     print(f"\nIN-SAMPLE leaderboard by net (model A, conservative), {len(rows)} strategies:")
-    print(f"{'strategy':34s} {'net A':>9s} {'net B':>9s} {'fees A':>8s} {'gas':>7s} {'IL real':>9s} "
-          f"{'reb':>4s} {'inrange':>7s} {'MDD':>6s}")
+    print(f"{'strategy':34s} {'net A':>9s} {'net B':>9s} {'vsHODL A':>9s} {'fees A':>8s} {'gas':>7s} "
+          f"{'IL real':>9s} {'reb':>5s} {'inrange':>7s} {'MDD':>6s}")
     for r in rows[:args.top] + ([{"name": "...", "metrics": None}] if len(rows) > args.top else []) \
             + [r for r in rows if r["name"] in ("passive_full_range", "w0.5_static")]:
         m = r["metrics"]
@@ -70,10 +70,12 @@ def main() -> None:
             print("  ...")
             continue
         print(f"{r['name']:34s} {m['net_a'] / usd:9,.0f} {m['net_b'] / usd:9,.0f} "
-              f"{m['fees_a'] / usd:8,.0f} {m['gas_cost'] / usd:7,.0f} {m['il_realized'] / usd:9,.0f} "
-              f"{m['rebalances']:4d} {m['time_in_range']:7.1%} {m['max_drawdown_a']:6.1%}")
-    hodl = rows[0]["metrics"]["value_hodl"] / usd - args.capital if rows else 0
-    print(f"\nHODL of the opening deposit: {hodl:+,.0f} USDC")
+              f"{m['vs_hodl_a'] / usd:9,.0f} {m['fees_a'] / usd:8,.0f} {m['gas_cost'] / usd:7,.0f} "
+              f"{m['il_realized'] / usd:9,.0f} {m['rebalances']:5d} {m['time_in_range']:7.1%} "
+              f"{m['max_drawdown_a']:6.1%}" + ("  RUINED" if m.get("ruined") else ""))
+    ruined = sum(1 for r in rows if r["metrics"].get("ruined"))
+    print(f"\nruined strategies (principal < 1% of capital): {ruined}")
+    print("vsHODL = result minus holding that strategy's own opening deposit (token mix differs)")
 
 
 if __name__ == "__main__":

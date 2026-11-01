@@ -216,3 +216,14 @@ def test_asymmetric_ratio_and_full_range():
         simulate(ds, spec(full_range=True, width_pct=0, rebalance="on_exit"))
     with pytest.raises(SimError):
         simulate(ds, spec(width_pct=0.1, rebalance="periodic"))
+
+
+def test_ruinous_strategy_stops_instead_of_failing(monkeypatch):
+    import backend.backtesting.position_sim as ps
+    monkeypatch.setattr(ps, "RUIN_DIVISOR", 1)  # SYNTHETIC: treat any loss as ruin
+    events, blocks = synthetic_history(n_swaps=600, drift=0.3, seed=3)
+    r = simulate(dataset(events, blocks), spec(width_pct=0.01, rebalance="on_exit"))
+    assert r.metrics["ruined"] and r.metrics["ruined_block"] is not None
+    rb = r.metrics["ruined_block"]
+    assert all(a.block < rb for a in r.actions)  # nothing is opened after ruin
+    assert r.timeseries[-1]["value_lp"] > 0 and not r.timeseries[-1]["in_range"]
