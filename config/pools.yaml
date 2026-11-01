@@ -1,0 +1,60 @@
+# Tokens and pools under research.
+# Pool addresses are DERIVED deterministically (CREATE2: factory + token0 +
+# token1 + fee + init code hash) and re-checked by tests/test_config.py.
+# On-chain existence and creation block must be confirmed in stage 2
+# (Factory.getPool / PoolCreated event) — status field tracks that.
+
+tokens:
+  ethereum:
+    WBTC:
+      address: "0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599"
+      decimals: 8
+      wrapped_asset: BTC
+      # WBTC is an IOU for BTC held by a custodian. It is NOT native Bitcoin.
+      risk_notes:
+        - custodial wrapper; peg to BTC depends on custodian/merchant redemption
+        - custody arrangement changed in 2024 (BitGo -> joint custody incl. BiT Global)
+        - all valuations use WBTC pool price in USDC, never a BTC index price
+    USDC:
+      address: "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"
+      decimals: 6
+      risk_notes:
+        - fiat-backed stablecoin; treated as 1 USD only with an explicit assumption flag
+        - "depeg precedent: March 2023 (SVB)"
+    WETH:
+      address: "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"
+      decimals: 18
+
+pools:
+  wbtc_usdc_3000:
+    network: ethereum
+    protocol: uniswap_v3
+    token0: WBTC          # token0 = lower address (sorted); price = token1 per token0
+    token1: USDC
+    fee: 3000             # 0.30%, hundredths of a bip
+    tick_spacing: 60
+    address: "0x99ac8cA7087fA4A2A1FB6357269965A2014ABc35"
+    status: derived_create2   # -> verified_onchain after stage 2
+  wbtc_usdc_500:
+    network: ethereum
+    protocol: uniswap_v3
+    token0: WBTC
+    token1: USDC
+    fee: 500
+    tick_spacing: 10
+    address: "0x9a772018FbD77fcD2d25657e5C547BAfF3Fd7D16"
+    status: derived_create2
+  # Planned extensions (architecture ready, not researched in MVP):
+  weth_usdc_500:
+    network: ethereum
+    protocol: uniswap_v3
+    token0: USDC          # NOTE: here USDC < WETH by address, so USDC is token0
+    token1: WETH
+    fee: 500
+    tick_spacing: 10
+    address: "0x88e6A0c2dDD26FEEb64F039a2c41296FcB3f5640"
+    status: derived_create2
+    enabled: false
+
+research:
+  primary_pool: wbtc_usdc_3000   # final choice after stage-2 activity comparison (3000 vs 500)

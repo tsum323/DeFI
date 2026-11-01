@@ -1,0 +1,48 @@
+# Networks and READ-ONLY data endpoints.
+# Endpoints are tried in order. API keys come from environment variables
+# (never committed). No signing keys exist anywhere in this project.
+#
+# Availability (2026-11-01, stage 2): eth-mainnet.g.alchemy.com is reachable;
+# publicnode/drpc are still blocked by the session network policy (403).
+# See docs/DATA_SOURCES.md §2.
+
+networks:
+  ethereum:
+    chain_id: 1
+    block_time_seconds: 12          # post-Merge slot time; used only for estimates
+    native_symbol: ETH
+    rpc:
+      - name: alchemy              # user's Alchemy endpoint (archive); domain allowed in env settings
+        url_env: ETH_RPC_URL
+        archive: true
+      - name: publicnode
+        url: https://ethereum-rpc.publicnode.com
+        archive: false             # free: only the last ~2-3 days; older -> 403 "personal token"
+      - name: drpc
+        url: https://eth.drpc.org
+        archive: true              # free plan serves old blocks (checked 2026-11-01)
+        max_logs_blocks: 100       # free plan: eth_getLogs windows above ~100 blocks rejected
+    indexers:
+      thegraph_uniswap_v3:
+        kind: subgraph
+        url_env: THEGRAPH_UNISWAP_V3_URL   # decentralized network gateway URL incl. API key
+        role: cross_check_only             # never the source of truth for fee replay
+      etherscan_v2:
+        kind: logs_api
+        url: https://api.etherscan.io/v2/api
+        api_key_env: ETHERSCAN_API_KEY
+        role: fallback_logs
+      bigquery_public:
+        kind: bigquery
+        dataset: bigquery-public-data.crypto_ethereum
+        project_env: GCP_PROJECT
+        role: bulk_backfill
+    oracles:
+      # Chainlink ETH/USD proxy; verified 2026-11-01: description() == "ETH / USD", decimals 8.
+      chainlink_eth_usd: "0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419"
+    uniswap_v3:
+      # Official Uniswap v3 deployment addresses on Ethereum mainnet.
+      factory: "0x1F98431c8aD98523631AE4a59f267346ea31F984"
+      nonfungible_position_manager: "0xC36442b4a4522E871399CD717aBDD847Ab11FE88"
+      pool_init_code_hash: "0xe34f199b19b2b4f47f68442619d555527d244f78a3297ea89325f843f87b8b54"
+      factory_deploy_block: 12369621   # TO VERIFY in stage 2 via eth_getCode bisection

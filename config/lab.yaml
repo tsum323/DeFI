@@ -1,0 +1,63 @@
+# Global lab settings.
+
+mode: research_only        # the ONLY supported mode. No trading, no wallets.
+
+database:
+  url: sqlite:///data/lab.sqlite   # PostgreSQL later: postgresql+psycopg://...
+
+data_engine:
+  logs_chunk_blocks: 5000          # initial eth_getLogs window, adaptively halved on errors
+  min_chunk_blocks: 50
+  confirmations: 64                # ~2 epochs: do not ingest unfinalized blocks
+  max_retries: 5
+  retry_backoff_seconds: [2, 4, 8, 16, 32]
+
+costs:
+  # MODELED: medians of gasUsed from 860 real receipts of wbtc_usdc_3000 txs, 2021-2026
+  # (scripts.calibrate_gas, 2026-11-01; data_snapshots/wbtc_usdc_3000/gas_calibration.json).
+  # Stable across years (yearly medians within ~10%). Was: 500k / 200k / 250k / 180k assumptions.
+  gas_units:
+    mint_new_position: 436000               # n=292, p25-p75 402k-446k, p90 488k
+    increase_liquidity: 200000              # n=97,  p25-p75 189k-238k, p90 245k
+    decrease_liquidity_and_collect: 200000  # n=260, p25-p75 183k-215k, p90 222k
+    swap_for_rebalance: 127000              # n=211 plain single-hop router swaps, p90 155k
+  gas_units_p90:                            # conservative set for sensitivity tests
+    mint_new_position: 488000
+    increase_liquidity: 245000
+    decrease_liquidity_and_collect: 222000
+    swap_for_rebalance: 155000
+  gas_price_source: block_base_fee_plus_priority   # historical baseFeePerGas per block
+  priority_fee_gwei: 1.0
+
+ai_researcher:
+  provider: anthropic
+  model: claude-opus-5-5           # swappable via adapter
+  api_key_env: ANTHROPIC_API_KEY
+  max_hypotheses_per_cycle: 5
+
+signal_engine:
+  validity_days: 7                 # a signal expires after this
+  max_data_age_minutes: 90         # older market data -> WAIT ("data not current")
+  min_volume_24h_usd: 100000       # pool activity filter
+  min_oos_positive_segments: 5     # of 7: excess over the passive LP > 0
+  require_positive_oos_roi: true   # mean absolute OOS ROI must be > 0 (SPEC 11.4)
+  max_mean_drawdown: 0.30
+  capital_usd: 10000
+  fee_lookback_days: [7, 30]       # fee estimate range from these windows
+  price_scenarios: [-0.20, -0.10, -0.05, 0.0, 0.05, 0.10, 0.20]
+
+scheduler:
+  max_parallel_heavy_jobs: 1        # heavy jobs never run concurrently (lock in the DB)
+  tick_seconds: 60
+  # SPEC 16 cycle: load data -> check -> market analysis -> strategies -> experiments ->
+  # optimization -> ranking -> hypotheses -> signals -> virtual positions -> save -> report
+  jobs:
+    sync:            {every_minutes: 15,    heavy: false, cmd: ["scripts.sync_pool", "--endpoint", "drpc", "--max-minutes", "10"]}
+    check_sources:   {every_minutes: 360,   heavy: false, cmd: ["scripts.check_data_sources"]}
+    evaluate_market: {every_minutes: 60,    heavy: false, cmd: ["scripts.evaluate_market"], after: ["sync"]}
+    forward_tests:   {every_minutes: 60,    heavy: false, cmd: ["scripts.forward_test"], after: ["sync"]}
+    validation:      {every_minutes: 10080, heavy: true,  cmd: ["scripts.run_validation"]}
+    optimization:    {every_minutes: 10080, heavy: true,  cmd: ["scripts.run_optuna", "--trials", "240"]}
+    research:        {every_minutes: 1440,  heavy: true,  cmd: ["scripts.run_research"], needs_env: ANTHROPIC_API_KEY}
+    report:          {every_minutes: 1440,  heavy: false, cmd: ["scripts.report"]}
+    save_snapshot:   {every_minutes: 1440,  heavy: false, cmd: ["scripts.data_snapshot", "export-research"]}

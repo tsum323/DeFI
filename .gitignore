@@ -1,0 +1,14 @@
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/
+.env
+data/*
+!data/.gitkeep
+experiments/*
+!experiments/.gitkeep
+node_modules/
+frontend/dist/
+*.sqlite
+*.db
+*.tsbuildinfo

@@ -1,0 +1,122 @@
+{
+  "format": "defi-lab-pool-snapshot/1",
+  "created_at": 1793541901,
+  "chain_id": 1,
+  "address": "0x99ac8cA7087fA4A2A1FB6357269965A2014ABc35",
+  "log_address": "0x99ac8ca7087fa4a2a1fb6357269965a2014abc35",
+  "pool": {
+    "chain_id": 1,
+    "address": "0x99ac8cA7087fA4A2A1FB6357269965A2014ABc35",
+    "key": "wbtc_usdc_3000",
+    "token0": "0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599",
+    "token1": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+    "fee": 3000,
+    "tick_spacing": 60,
+    "created_block": 12376048,
+    "created_tx": "0x2acb44ed240131e3a05eacc0ee870bdf93564f299eb633156a60d81055a352eb",
+    "verified_at_block": 26319918,
+    "verified_source": "alchemy"
+  },
+  "coverage": {
+    "start_block": 12376048,
+    "last_block": 26320225,
+    "open_gaps": 0
+  },
+  "counts": {
+    "blocks": 576551,
+    "raw_logs": 717865
+  },
+  "files": [
+    {
+      "name": "blocks_000.csv.xz",
+      "kind": "blocks",
+      "rows": 150000,
+      "first_block": 12376048,
+      "last_block": 17196242,
+      "bytes": 6594212,
+      "sha256": "9c972477d80124197cb32cf0cd67d5c2703cc8e143a784f0e8756d0e92601480"
+    },
+    {
+      "name": "blocks_001.csv.xz",
+      "kind": "blocks",
+      "rows": 150000,
+      "first_block": 17196269,
+      "last_block": 22920788,
+      "bytes": 6828272,
+      "sha256": "b86af8e6fc01742059387cca105d029e535b56d7696bec4ae664aa324c8914da"
+    },
+    {
+      "name": "blocks_002.csv.xz",
+      "kind": "blocks",
+      "rows": 150000,
+      "first_block": 22920798,
+      "last_block": 25941629,
+      "bytes": 6553488,
+      "sha256": "187078b5ee6a8b4ecf2f18e55c379fa9e55014cb583c8c5a67b7d9e6631b3b64"
+    },
+    {
+      "name": "blocks_003.csv.xz",
+      "kind": "blocks",
+      "rows": 126551,
+      "first_block": 25941630,
+      "last_block": 26319970,
+      "bytes": 5271544,
+      "sha256": "df0cccea29e786f536d30e4411dd9d64fca57a7b9bda2bb06ce47ac93aa398eb"
+    },
+    {
+      "name": "logs_000.csv.xz",
+      "kind": "logs",
+      "rows": 120000,
+      "first_block": 12376048,
+      "last_block": 15090297,
+      "bytes": 8475736,
+      "sha256": "73cea149ddbbb88f9d880abaaeeb36b28bf7186cfec22668cb65c4727242fe17"
+    },
+    {
+      "name": "logs_001.csv.xz",
+      "kind": "logs",
+      "rows": 120000,
+      "first_block": 15090446,
+      "last_block": 20516135,
+      "bytes": 8416464,
+      "sha256": "7ac0bb2113da0d03877b96a7310ffb4254afb9ad4e967a26198b3c2bab2411fc"
+    },
+    {
+      "name": "logs_002.csv.xz",
+      "kind": "logs",
+      "rows": 120000,
+      "first_block": 20516137,
+      "last_block": 22638950,
+      "bytes": 7906636,
+      "sha256": "125771e767306f05b6aba87034804aa1ac52ff476d154accb025e89f334d007d"
+    },
+    {
+      "name": "logs_003.csv.xz",
+      "kind": "logs",
+      "rows": 120000,
+      "first_block": 22638952,
+      "last_block": 24618731,
+      "bytes": 7647432,
+      "sha256": "2fbe0a3d36b1ce3c9eb29acdfe6a27816fd0c35134624985aa2e445b6502d699"
+    },
+    {
+      "name": "logs_004.csv.xz",
+      "kind": "logs",
+      "rows": 120000,
+      "first_block": 24618731,
+      "last_block": 25980743,
+      "bytes": 6150360,
+      "sha256": "4e0883ca796588ef59666c1015570e6ee928f2fb797960ebb9b84f3de8a033b5"
+    },
+    {
+      "name": "logs_005.csv.xz",
+      "kind": "logs",
+      "rows": 117865,
+      "first_block": 25980744,
+      "last_block": 26319970,
+      "bytes": 4857144,
+      "sha256": "c61176a09b64de765a250b76c35a9e51f0570234989d3dfeb409f0949138b9a2"
+    }
+  ],
+  "note": "EXACT on-chain data. ev_* tables are re-decoded from raw logs on restore."
+}
