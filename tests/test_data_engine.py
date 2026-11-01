@@ -333,3 +333,27 @@ def test_sync_block_meta_probe_detects_bad_hash(engine, monkeypatch):
     with pytest.raises(IntegrityError):
         s.run(100, 2000)
     assert coverage_report(engine, 1, POOL)["open_gaps"] == 1
+
+
+def test_snapshot_roundtrip_is_exact(engine, tmp_path):
+    # SYNTHETIC chain; checks export -> restore reproduces raw + decoded tables.
+    from backend.data_engine.snapshot import SnapshotError, export_pool, restore_pool
+    chain = FakeChain(_logs())
+    PoolSyncer(chain, engine, 1, POOL).run(100, 2000)
+    m = export_pool(engine, 1, POOL, tmp_path / "snap", log_rows_per_part=2, block_rows_per_part=3)
+    assert m["counts"] == {"blocks": 4, "raw_logs": 5} and len(m["files"]) == 2 + 3
+    other = S.make_engine("sqlite:///:memory:")
+    res = restore_pool(other, tmp_path / "snap")
+    assert res["raw_logs"] == 5 and coverage_report(other, 1, POOL)["last_block"] == 2000
+
+    def dump(e, t):
+        with e.connect() as c:
+            return sorted(tuple(r) for r in c.execute(select(t)))
+    for t in [S.blocks, S.raw_logs, *S.event_tables.values()]:
+        assert dump(engine, t) == dump(other, t), t.name
+    restore_pool(other, tmp_path / "snap")  # idempotent
+    assert dump(engine, S.raw_logs) == dump(other, S.raw_logs)
+    part = tmp_path / "snap" / m["files"][0]["name"]
+    part.write_bytes(part.read_bytes()[:-1] + b"\x00")
+    with pytest.raises(SnapshotError):
+        restore_pool(other, tmp_path / "snap")
