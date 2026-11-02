@@ -9,8 +9,8 @@
    "sha256": "7bd2cc8ac96c104a488608934fb20daaa10e0b70929747c5320e47b0497a1e44"
   },
   "forward_tests": {
-   "rows": 9,
-   "sha256": "e59ac22bda84e579e86af36b17882e28b124e54bc13366edc06b3858f5a98a35"
+   "rows": 14,
+   "sha256": "216b64bbd1c219238d7af95eb7ab061a625e91c8d00634a1f631a54f053f528a"
   },
   "hypotheses": {
    "rows": 5,
@@ -25,8 +25,16 @@
    "sha256": "e04134c1b590548dce6cad510bb8efaa2b04549d8833b0bbf085b2ee7f8af8b3"
   },
   "market_evaluations": {
-   "rows": 11,
-   "sha256": "38a5015270d2ecfdb60a776ec426827129138ae518e9c480de3d2e455eae77b9"
+   "rows": 48,
+   "sha256": "09445c5e5ea70b3e3cbcb9604552ca07e5fb9798285fbbf7971b8a2c6c38fd67"
+  },
+  "opportunity_events": {
+   "rows": 21,
+   "sha256": "c353790439e5a6eaef91027525002bb8e7bd6a7cbd7e7105defa3e362db074a4"
+  },
+  "opportunity_rankings": {
+   "rows": 1,
+   "sha256": "d0f36a691f1e100e560ec2e93fa175d60636c006a4b88d1f4899c495d16f309d"
   },
   "signal_events": {
    "rows": 3,
