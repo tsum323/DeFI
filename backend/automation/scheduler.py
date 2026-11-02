@@ -36,6 +36,7 @@ class Job:
     heavy: bool = False
     after: tuple[str, ...] = ()
     needs_env: str | None = None
+    only_if: str | None = None   # "study_outdated": run on schedule only when it is
 
     @property
     def timeout(self) -> int:
@@ -46,7 +47,7 @@ def jobs_from_config(cfg) -> list[Job]:
     out = []
     for name, j in cfg.lab["scheduler"]["jobs"].items():
         out.append(Job(name, int(j["every_minutes"]), list(j["cmd"]), bool(j.get("heavy", False)),
-                       tuple(j.get("after", ())), j.get("needs_env")))
+                       tuple(j.get("after", ())), j.get("needs_env"), j.get("only_if")))
     return out
 
 
@@ -162,6 +163,13 @@ class Scheduler:
         if job.needs_env and not os.environ.get(job.needs_env):
             self._record(job, trigger, "skipped", None, f"{job.needs_env} is not set", started)
             return "skipped"
+        if job.only_if == "study_outdated" and trigger == "schedule":
+            from backend.validation.freshness import study_outdated
+            why = study_outdated()
+            if why is None:
+                self._record(job, trigger, "skipped", None,
+                             "stored historical study is current: reused, not recomputed", started)
+                return "skipped"
         if job.heavy and not self._acquire_heavy(job):
             self._record(job, trigger, "skipped", None, "another heavy job is running", started)
             return "skipped"

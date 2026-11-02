@@ -135,9 +135,24 @@ def evaluate_candidates(table: dict, strategies: dict[str, StrategyParams], stud
 
 
 # ---------------------------------------------------------------- signal content
+_FEE_CACHE: dict = {}
+
+
 def _fee_estimate(ds: Dataset, state_at_fn, lower: int, upper: int, liq: int, block: int,
                   days: int) -> dict:
-    """Fees the exact range would have earned over the last `days` (A/B), replayed."""
+    """Fees the exact range would have earned over the last `days` (A/B), replayed.
+    Memoized per (dataset, range, liquidity, block, window): strategies that open the same
+    position share one replay."""
+    key = (id(ds), lower, upper, liq, block, days)
+    if key not in _FEE_CACHE:
+        if len(_FEE_CACHE) > 256:
+            _FEE_CACHE.clear()
+        _FEE_CACHE[key] = _fee_estimate_uncached(ds, state_at_fn, lower, upper, liq, block, days)
+    return _FEE_CACHE[key]
+
+
+def _fee_estimate_uncached(ds: Dataset, state_at_fn, lower: int, upper: int, liq: int, block: int,
+                           days: int) -> dict:
     ts = ds.blocks[block][0]
     blocks = sorted(b for b in ds.blocks if b <= block)
     start_i = bisect.bisect_left([ds.blocks[b][0] for b in blocks], ts - days * DAY)

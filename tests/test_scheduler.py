@@ -79,3 +79,34 @@ def test_heavy_jobs_never_overlap(tmp_path):
     s = s2
     assert s2.run("heavy") == "ok" and inner == ["skipped"]
     assert os.getpid()  # sanity
+
+
+def test_heavy_research_reused_unless_study_outdated(tmp_path, monkeypatch):
+    import backend.validation.freshness as F
+    calls = []
+    s, engine, clock = make(tmp_path, lambda j: (calls.append(j.name), (0, "ok"))[1],
+                            [Job("validation", 10080, ["v"], heavy=True, only_if="study_outdated")])
+    monkeypatch.setattr(F, "study_outdated", lambda now=None: None)
+    assert s.run("validation") == "skipped" and calls == []          # current study: reused
+    assert s.run("validation", trigger="manual") == "ok"             # a manual run is allowed
+    monkeypatch.setattr(F, "study_outdated", lambda now=None: "result code changed")
+    assert s.run("validation") == "ok" and calls == ["validation", "validation"]
+    with engine.connect() as c:
+        logs = [r.log for r in c.execute(select(S.job_runs).where(S.job_runs.c.status == "skipped"))]
+    assert "reused, not recomputed" in logs[0]
+
+
+def test_study_outdated_rules(tmp_path, monkeypatch):
+    import json
+
+    import backend.validation.freshness as F
+    d = tmp_path / "data_snapshots" / "validation"
+    d.mkdir(parents=True)
+    monkeypatch.setattr(F, "ROOT", tmp_path)
+    monkeypatch.setattr("backend.strategies.mass_test.code_version", lambda rev="HEAD": "sim-a")
+    assert F.study_outdated() == "no stored study"
+    (d / "validation_x.json").write_text(json.dumps({"code_version": "sim-a", "segments": [{"end_ts": 1000}]}))
+    assert F.study_outdated(now=1000 + 90 * 86400) is None
+    assert "new 91-day segment" in F.study_outdated(now=1000 + 91 * 86400)
+    monkeypatch.setattr("backend.strategies.mass_test.code_version", lambda rev="HEAD": "sim-b")
+    assert "result code changed" in F.study_outdated(now=1000)

@@ -64,11 +64,28 @@ def watch_names(engine) -> dict[int, str]:
 
     from backend.database import schema as S
     from backend.strategies.generator import params_from_json
-    from backend.virtual_portfolio.portfolio import WATCH_PREFIX
+    from backend.virtual_portfolio.portfolio import OPPORTUNITY_PREFIX, WATCH_PREFIX
     with engine.connect() as c:
-        return {r.id: f"{params_from_json(r.params_json).name}: {r.reason.removeprefix(WATCH_PREFIX)}"
-                for r in c.execute(select(S.forward_tests).where(
-                    S.forward_tests.c.reason.startswith(WATCH_PREFIX)))}
+        return {r.id: f"{params_from_json(r.params_json).name}: "
+                      f"{r.reason.removeprefix(WATCH_PREFIX).removeprefix(OPPORTUNITY_PREFIX)}"
+                for r in c.execute(select(S.forward_tests)) if r.reason.startswith((WATCH_PREFIX, OPPORTUNITY_PREFIX))}
+
+
+def conservative_entries(engine, after_id: int) -> list[str]:
+    from sqlalchemy import select
+
+    from backend.database import schema as S
+    with engine.connect() as c:
+        return [e.strategy for e in c.execute(select(S.opportunity_events).where(
+            S.opportunity_events.c.id > after_id, S.opportunity_events.c.tier_to == "CONSERVATIVE"))]
+
+
+def last_event_id(engine) -> int:
+    from sqlalchemy import func, select
+
+    from backend.database import schema as S
+    with engine.connect() as c:
+        return c.execute(select(func.max(S.opportunity_events.c.id))).scalar() or 0
 
 
 def message(sig: dict) -> tuple[str, str]:
@@ -122,11 +139,13 @@ def main() -> None:
     engine = S.make_engine(cfg.lab["database"]["url"])
     before = latest_signal(engine)
     watch_before = watch_names(engine)
+    ev_before = last_event_id(engine)
     run("scripts.sync_pool", "--endpoint", "drpc", "--max-minutes", "15", check=False)
     run("scripts.evaluate_market")
     run("scripts.forward_test", check=False)
     after = latest_signal(engine)
     new_watch = [v for k, v in watch_names(engine).items() if k not in watch_before]
+    new_conservative = conservative_entries(engine, ev_before)
 
     out = ROOT / args.out
     shutil.rmtree(out, ignore_errors=True)
@@ -137,7 +156,8 @@ def main() -> None:
     c = TestClient(app)
     data = out / "data"
     have = {p.stem.removeprefix("strategy_") for p in data.glob("strategy_*.json")}
-    for name in ("overview", "strategies", "research", "signals", "portfolio", "datasources"):
+    for name in ("overview", "strategies", "research", "signals", "opportunities", "portfolio",
+                 "datasources"):
         doc = c.get(f"/api/{name}").json()
         if name == "strategies":
             for r in doc["rows"]:
@@ -154,10 +174,16 @@ def main() -> None:
                   or (after["id"] != before["id"] and after["type"] != "WAIT")):
         title, body = message(after)
         notify = {"title": title, "body": body}
+    elif new_conservative:
+        notify = {"title": "WBTC/USDC: новая CONSERVATIVE-возможность",
+                  "body": "\n".join([("Стратегия прошла все исторические проверки и даёт положительный "
+                                      "ожидаемый результат после расходов:"), ""]
+                                    + [f"- {x}" for x in new_conservative]
+                                    + ["", f"Подробности: {SITE_URL} (раздел «Центр сигналов»)."])}
     elif new_watch:
-        notify = {"title": "WBTC/USDC: новая стратегия в наблюдении",
-                  "body": "\n".join([("Стратегии, которым до сигнала не хватает одной проверки, взяты на "
-                                      "виртуальный тест на новых данных. **Это не сигнал на открытие.**"), ""]
+        notify = {"title": "WBTC/USDC: новые возможности в виртуальном портфеле",
+                  "body": "\n".join([("Лучшие текущие возможности взяты на виртуальный тест на новых "
+                                      "данных. **Это не сигнал на открытие.**"), ""]
                                     + [f"- {x}" for x in new_watch]
                                     + ["", f"Подробности: {SITE_URL} (раздел «Центр сигналов» → «Наблюдение»)."])}
     Path(args.notify_file).write_text(json.dumps(notify) if notify else "")

@@ -1,6 +1,6 @@
 import { Badge, Card, Loading, Pill, Stat } from "../components/ui";
 import { useApi } from "../components/useApi";
-import { date, pct, pctAbs, sign, usd } from "../format";
+import { date, num, pct, pctAbs, sign, usd } from "../format";
 
 interface Portfolio {
   journal: { counts: Record<string, number>; cumulative_net_a: number; return_week: number | null;
@@ -41,16 +41,30 @@ export default function PortfolioPage() {
                 <td className={sign(p.vs_passive_a)}>{p.vs_passive_a === null ? "—" : usd(p.vs_passive_a / 1e6, 2)}</td></tr>);
             })}</tbody></table></div>)}
       </Card>
-      <Card title="Прямые тесты кандидатов на новых данных" label="MODELED" right={<Pill>не сигналы</Pill>}>
-        <p className="muted">Параметры зафиксированы при постановке; оцениваются только данные, которых тогда не было.</p>
+      <Card title="Виртуальный мониторинг возможностей и кандидатов" label="MODELED" right={<Pill>не сигналы · без реальных денег</Pill>}>
+        <p className="muted">Каждая возможность из рейтинга (лучшие 3 в каждой категории) и каждая стратегия «наблюдения» ставится сюда один раз:
+          цена, диапазон и доли активов фиксируются в момент появления; дальше — только новые данные. Комиссии моделируются на точной
+          реконструкции пула, учитывается время вне диапазона, непостоянные потери (IL), газ и обмены при перестановках, сравнение с HODL
+          и пассивным размещением. Капитал $10 000.</p>
         <div className="table-wrap"><table className="table">
-          <thead><tr><th>#</th><th>Стратегия</th><th>С блока</th><th>Причина</th><th>Дней</th><th>Итог</th><th>К пассивному</th><th>Перест.</th></tr></thead>
-          <tbody>{d.forward_tests.map((f) => (
-            <tr key={f.id}><td>{f.id}</td><td>{f.result?.strategy ?? "—"}</td><td>{f.start_block}<div className="muted">{date(f.created_at)}</div></td>
-              <td className="muted">{f.reason}</td><td>{f.result ? f.result.days.toFixed(1) : "ждёт новых блоков"}</td>
-              <td className={sign(f.result?.net_a)}>{f.result ? usd(f.result.net_a / 1e6, 2) : "—"}</td>
-              <td className={sign(f.result?.vs_passive_a)}>{f.result?.vs_passive_a != null ? usd(f.result.vs_passive_a / 1e6, 2) : "—"}</td>
-              <td>{f.result?.rebalances ?? "—"}</td></tr>))}</tbody></table></div>
+          <thead><tr><th>#</th><th>Стратегия</th><th>Откуда</th><th>Вход: цена · диапазон · USDC</th><th>Сейчас</th><th>Дней</th>
+            <th>Комиссии</th><th>IL</th><th>Расходы</th><th>Итог</th><th>К HODL</th><th>К пассивному</th><th>В диапазоне</th></tr></thead>
+          <tbody>{d.forward_tests.map((f) => {
+            const r = f.result; const e = r?.entry; const n = r?.now;
+            return (<tr key={f.id}><td>{f.id}</td><td>{r?.strategy ?? "—"}<div className="muted">{date(f.created_at)}</div></td>
+              <td className="muted">{f.reason}</td>
+              <td>{e ? <>{num(e.price, 0)} · {num(e.price_lower, 0)}–{num(e.price_upper, 0)} · {pctAbs(e.usdc_share, 0)}</> : "—"}</td>
+              <td>{n ? <>{num(n.price, 0)}{n.price_lower != null && <div className="muted">{num(n.price_lower, 0)}–{num(n.price_upper, 0)}</div>}</> : "—"}</td>
+              <td>{r ? r.days.toFixed(1) : "ждёт новых блоков"}</td>
+              <td>{r ? usd(r.fees_a / 1e6, 2) : "—"}</td>
+              <td className={sign(r?.il)}>{r?.il != null ? usd(r.il / 1e6, 2) : "—"}</td>
+              <td>{r ? usd((r.gas_cost + (r.swap_cost ?? 0)) / 1e6, 2) : "—"}</td>
+              <td className={sign(r?.net_a)}>{r ? usd(r.net_a / 1e6, 2) : "—"}</td>
+              <td className={sign(r?.vs_hodl_a)}>{r?.vs_hodl_a != null ? usd(r.vs_hodl_a / 1e6, 2) : "—"}</td>
+              <td className={sign(r?.vs_passive_a)}>{r?.vs_passive_a != null ? usd(r.vs_passive_a / 1e6, 2) : "—"}</td>
+              <td>{r?.time_in_range != null ? pctAbs(r.time_in_range, 0) : "—"}{n && <div className="muted">{n.in_range ? "сейчас внутри" : "сейчас вне"}</div>}
+                {r?.rebalances ? <div className="muted">перест.: {r.rebalances}</div> : null}</td></tr>);
+          })}</tbody></table></div>
       </Card>
       <Card title="История сигналов">
         <ul>{d.journal.signals.map((s) => <li key={s.signal_id}>#{s.signal_id} {s.type} · {s.status ?? "—"} · {date(s.created_at)}

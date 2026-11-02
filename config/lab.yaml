@@ -56,8 +56,10 @@ scheduler:
     check_sources:   {every_minutes: 360,   heavy: false, cmd: ["scripts.check_data_sources"]}
     evaluate_market: {every_minutes: 60,    heavy: false, cmd: ["scripts.evaluate_market"], after: ["sync"]}
     forward_tests:   {every_minutes: 60,    heavy: false, cmd: ["scripts.forward_test"], after: ["sync"]}
-    validation:      {every_minutes: 10080, heavy: true,  cmd: ["scripts.run_validation"]}
-    optimization:    {every_minutes: 10080, heavy: true,  cmd: ["scripts.run_optuna", "--trials", "240"]}
+    # heavy research: checked weekly, but runs only if the stored study is outdated
+    # (result code changed or a new 91-day segment is complete); otherwise it is reused
+    validation:      {every_minutes: 10080, heavy: true,  only_if: study_outdated, cmd: ["scripts.run_validation"]}
+    optimization:    {every_minutes: 10080, heavy: true,  only_if: study_outdated, cmd: ["scripts.run_optuna", "--trials", "240"]}
     research:        {every_minutes: 1440,  heavy: true,  cmd: ["scripts.run_research"], needs_env: ANTHROPIC_API_KEY}
     report:          {every_minutes: 1440,  heavy: false, cmd: ["scripts.report"]}
     save_snapshot:   {every_minutes: 1440,  heavy: false, cmd: ["scripts.data_snapshot", "export-research"]}

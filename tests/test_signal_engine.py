@@ -221,3 +221,51 @@ def test_data_age_counts_synced_blocks_without_events(tmp_path):
     fresh = snapshot(ds, st, now, vol_median=1e9, synced_block=st.block + 3 * 3600 // 12 - 5)
     assert stale.data_age_seconds == 3 * 3600 and fresh.data_age_seconds == 60
     assert snapshot(ds, st, now, 1e9, synced_block=st.block + 10 ** 6).data_age_seconds == 0
+
+
+def test_opportunity_tiers_ranking_history_and_virtual(tmp_path):
+    # SYNTHETIC: one clean strategy (all checks) -> CONSERVATIVE; one unstable on IS -> MODERATE
+    from backend.api.queries import opportunities
+    from backend.signal_engine.engine import contaminated_specs, evaluate_candidates
+    from backend.signal_engine.opportunities import (exit_probability, opportunity, rank_opportunities,
+                                                     save_ranking, tier_of)
+    from backend.virtual_portfolio.portfolio import register_opportunities
+    ds, st, snap, study, engine = setup(tmp_path)
+    good = StrategyParams(width_pct=0.3, rebalance="on_exit")
+    unstable = StrategyParams(width_pct=0.5)
+    bad = StrategyParams(width_pct=0.05, rebalance="on_exit")
+    t = table_with(study, good, bad)
+    for s in study.segments:
+        for var in ("base", "gas_x2"):
+            t[(unstable.spec_hash, s.index, var)] = metrics(0.02 if s.role == "OOS" else -0.02)
+    strats = strategies(good, unstable, bad)
+    cands = evaluate_candidates(t, strats, study, snap, CFG, contaminated_specs(engine))
+    tiers = {c.params.name: tier_of(c)[0] for c in cands}
+    assert tiers[good.name] == "CONSERVATIVE" and tiers[unstable.name] == "MODERATE"
+    assert tiers[bad.name] is None
+    # the synthetic pool is very volatile (~270%/yr): after IL and the entry swap the expected
+    # result is negative, so the ranking must move them to the diagnostics, not show them
+    r = rank_opportunities(ds, st, snap, cands, t, study, CFG, lambda b: state_at(ds, b), snap.timestamp + 60,
+                           META, {good.spec_hash: 0.7, unstable.spec_hash: 0.6})
+    for o in (o for tier in r["tiers"].values() for o in tier):
+        assert o["expected_net_mid_usd"] > 0
+    diag = {d["strategy"]: d for d in r["diagnostics"]}
+    assert "negative_net" in diag[good.name]["blockers"] and diag[bad.name]["tier"] is None
+    # a card, its storage, history and virtual tracking
+    c = next(c for c in cands if c.params == good)
+    card = opportunity(ds, st, snap, c, "CONSERVATIVE", [], CFG, lambda b: state_at(ds, b),
+                       snap.timestamp + 60, META, 0.7, {})
+    assert card["range"]["price_lower"] < card["current_price"] < card["range"]["price_upper"]
+    assert card["risk"] in ("low", "medium", "high") and card["reasons"] and card["costs_usd"]["swap"] > 0
+    card["variants"] = []
+    ranking = {"created_at": snap.timestamp, "block": snap.block, "pool": META["pool"],
+               "tiers": {"CONSERVATIVE": [card], "MODERATE": [], "EXPERIMENTAL": []}}
+    ev = save_ranking(engine, ranking)
+    assert [(e["strategy"], e["tier_from"], e["tier_to"]) for e in ev] == [(good.name, None, "CONSERVATIVE")]
+    assert save_ranking(engine, ranking) == []  # unchanged ranking -> no new history
+    assert save_ranking(engine, {**ranking, "tiers": {}})[0]["tier_to"] is None  # left the ranking
+    assert register_opportunities(engine, ranking, strats, snap.block, 10 ** 6) == [f"CONSERVATIVE: {good.name}"]
+    assert register_opportunities(engine, ranking, strats, snap.block, 10 ** 6) == []
+    api = opportunities(engine)
+    assert len(api["events"]) == 2 and [v["kind"] for v in api["virtual"]] == ["opportunity"]
+    assert exit_probability(100, 50, 200, 0.01) < 1e-6 and exit_probability(100, 99, 101, 0.5) == 1.0

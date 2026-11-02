@@ -21,7 +21,8 @@ from backend.database import schema as S
 
 TABLES = ("strategies", "datasets", "experiments", "validation_reports", "hypotheses",
           "hypothesis_experiments", "signals", "signal_events", "market_evaluations",
-          "virtual_positions", "forward_tests", "job_runs")
+          "virtual_positions", "forward_tests", "job_runs", "opportunity_rankings",
+          "opportunity_events")
 SKIP_COLUMNS = {"experiments": {"actions_json"}}  # large and not needed for research
 
 

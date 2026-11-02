@@ -23,8 +23,18 @@ from sqlalchemy import select
 from backend.backtesting.dataset import ROOT, cached_state_at, load_dataset
 from backend.core.config import load_config
 from backend.database import schema as S
-from backend.signal_engine.engine import evaluate_market, load_strategies
+from backend.signal_engine.engine import (
+    contaminated_specs,
+    evaluate_candidates,
+    evaluate_market,
+    load_strategies,
+)
 from backend.signal_engine.market import latest_event_block, snapshot
+from backend.signal_engine.opportunities import (
+    load_robustness,
+    rank_opportunities,
+    save_ranking,
+)
 from backend.strategies.mass_test import code_version, relabel_commit_versions
 from backend.validation.segments import load_segment_table
 from backend.validation.study import setup_study
@@ -32,6 +42,7 @@ from backend.virtual_portfolio.portfolio import (
     journal,
     mark_all,
     open_new_positions,
+    register_opportunities,
     register_watch,
 )
 
@@ -106,6 +117,25 @@ def main() -> None:
                                    int(sc["capital_usd"] * 10 ** ds.decimals1))
         for name in new_watch:
             print(f"  взята на прямой тест (наблюдение): {name}")
+    # current opportunities from the stored study (no historical recomputation)
+    strategies = load_strategies(engine)
+    cands = evaluate_candidates(table, strategies, study, snap, sc, contaminated_specs(engine))
+    ranking = rank_opportunities(ds, state, snap, cands, table, study, sc, lambda b: cached_state_at(ds, b),
+                                 now, meta, load_robustness(engine, code_version()))
+    events = save_ranking(engine, ranking)
+    print("\nАКТУАЛЬНЫЕ ВОЗМОЖНОСТИ (SCENARIO, не сигнал на открытие):")
+    for tier, opps in ranking["tiers"].items():
+        print(f"  {tier}: {len(opps)}")
+        for o in opps[:3]:
+            r = o["range"]
+            print(f"    {o['strategy']}: {r['price_lower']:,.0f}–{r['price_upper']:,.0f} USDC, "
+                  f"к HODL за {o['horizon_days']} дн. ${o['expected_net_vs_hodl_usd'][0]:,.0f}…"
+                  f"${o['expected_net_vs_hodl_usd'][1]:,.0f}, риск {o['risk']}, оценка {o['perspective_score']}")
+    for e in events:
+        print(f"  изменение: {e['strategy']} {e['tier_from']} → {e['tier_to']}")
+    for name in register_opportunities(engine, ranking, strategies, snap.block,
+                                       int(sc["capital_usd"] * 10 ** ds.decimals1)):
+        print(f"  взята в виртуальный портфель: {name}")
     opened = open_new_positions(engine)
     marks = mark_all(engine, ds, lambda b: cached_state_at(ds, b), snap.block,
                      priority_fee_gwei=cfg.lab["costs"]["priority_fee_gwei"])

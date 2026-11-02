@@ -206,6 +206,30 @@ def signals(engine) -> dict:
     return {"signals": rows, "active": active, "watch": watch(engine), "label": "SCENARIO"}
 
 
+def opportunities(engine) -> dict:
+    """Latest ranking of current LP opportunities, its change history and the virtual
+    tests that follow them."""
+    from backend.virtual_portfolio.portfolio import OPPORTUNITY_PREFIX, WATCH_PREFIX
+    with engine.connect() as c:
+        row = c.execute(select(S.opportunity_rankings).order_by(S.opportunity_rankings.c.id.desc())
+                        .limit(1)).first()
+        evs = c.execute(select(S.opportunity_events).order_by(S.opportunity_events.c.id.desc())
+                        .limit(100)).all()
+        fts = c.execute(select(S.forward_tests).order_by(S.forward_tests.c.id)).all()
+    ranking = json.loads(row.payload_json) if row else None
+    virtual = []
+    for f in fts:
+        kind = ("opportunity" if f.reason.startswith(OPPORTUNITY_PREFIX) else
+                "watch" if f.reason.startswith(WATCH_PREFIX) else "research")
+        virtual.append({"id": f.id, "kind": kind, "spec_hash": f.spec_hash,
+                        "name": params_from_json(f.params_json).name, "created_at": f.created_at,
+                        "start_block": f.start_block,
+                        "reason": f.reason.removeprefix(OPPORTUNITY_PREFIX).removeprefix(WATCH_PREFIX),
+                        "result": json.loads(f.result_json) if f.result_json else None})
+    return {"ranking": ranking, "events": [dict(e._mapping) for e in evs], "virtual": virtual,
+            "label": "SCENARIO"}
+
+
 def watch(engine) -> dict:
     """Watch level: strategies one filter short of a signal, followed on new data."""
     from backend.virtual_portfolio.portfolio import WATCH_PREFIX

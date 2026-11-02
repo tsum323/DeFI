@@ -265,6 +265,29 @@ forward_tests = Table(  # candidates watched on data that did not exist when the
 )
 
 
+# ------------------------------------------------------------ current LP opportunities
+opportunity_rankings = Table(  # the latest ranking only (recomputed after every market update)
+    "opportunity_rankings", metadata,
+    Column("id", Integer, primary_key=True, autoincrement=True),
+    Column("created_at", BigInteger, nullable=False),
+    Column("block", BigInteger, nullable=False),
+    Column("pool", String(64), nullable=False),
+    Column("payload_json", Text, nullable=False),
+)
+
+opportunity_events = Table(  # history: a strategy enters, changes or leaves a tier
+    "opportunity_events", metadata,
+    Column("id", Integer, primary_key=True, autoincrement=True),
+    Column("created_at", BigInteger, nullable=False),
+    Column("block", BigInteger, nullable=False),
+    Column("pool", String(64), nullable=False),
+    Column("spec_hash", String(64), nullable=False),
+    Column("strategy", String(128), nullable=False),
+    Column("tier_from", String(16)),
+    Column("tier_to", String(16)),
+    Column("details_json", Text),
+)
+
 # ------------------------------------------------------------ scheduler (SPEC 16)
 job_runs = Table(
     "job_runs", metadata,

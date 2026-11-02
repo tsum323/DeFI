@@ -236,6 +236,55 @@ def register_watch(engine, watch: list[dict], strategies: dict, start_block: int
         out.append(p.name)
     return out
 
+def _entry_and_now(r: PositionResult, dec_shift: int) -> dict:
+    """Price, range and deposit ratio when the virtual position opened; price and range
+    status now (from the simulation, MODELED). Range bounds: p(tick) = 1.0001^tick * 10^shift."""
+    out = {}
+    ts = r.timeseries
+    if not ts:
+        return out
+
+    def px(tick: int, _ref: dict) -> float:
+        return 1.0001 ** tick * 10 ** dec_shift
+    first = next((a for a in r.actions if a.kind == "open"), None)
+    if first is not None:
+        ref = next((x for x in ts if x["block"] >= first.block), ts[0])
+        out["entry"] = {"block": first.block, "timestamp": first.timestamp, "price": ref["price"],
+                        "price_lower": px(first.tick_lower, ref), "price_upper": px(first.tick_upper, ref),
+                        "usdc_share": first.ratio_token1_actual}
+    last = ts[-1]
+    out["now"] = {"price": last["price"], "in_range": last["in_range"], "timestamp": last["timestamp"]}
+    cur = [a for a in r.actions if a.kind in ("open", "rebalance")]
+    if cur:
+        out["now"].update({"price_lower": px(cur[-1].tick_lower, last),
+                           "price_upper": px(cur[-1].tick_upper, last)})
+    return out
+
+OPPORTUNITY_PREFIX = "opportunity: "
+
+
+def register_opportunities(engine, ranking: dict, strategies: dict, start_block: int,
+                           capital_token1: int, per_tier: int = 3) -> list[str]:
+    """Follow the best opportunities of every tier in the virtual portfolio, each strategy
+    once, from the block it first appeared. Price, range and deposit at that moment are
+    stored in the reason (the simulation re-derives them with the same rule)."""
+    with engine.connect() as conn:
+        have = set(conn.execute(select(S.forward_tests.c.spec_hash)).scalars())
+    out = []
+    for tier, opps in ranking.get("tiers", {}).items():
+        for o in opps[:per_tier]:
+            p = strategies.get(o["spec_hash"])
+            if p is None or o["spec_hash"] in have:
+                continue
+            r, a = o["range"], o["allocation"]
+            add_forward_test(engine, p, start_block, capital_token1,
+                             f"{OPPORTUNITY_PREFIX}{tier}; price {o['current_price']:.0f}, range "
+                             f"{r['price_lower']:.0f}-{r['price_upper']:.0f}, deposit "
+                             f"{a['token0']:.6f} + {a['token1']:.2f}")
+            have.add(o["spec_hash"])
+            out.append(f"{tier}: {p.name}")
+    return out
+
 def mark_forward_tests(engine, ds: Dataset, state_at_fn, latest_block: int,
                        priority_fee_gwei: float = 1.0) -> list[dict]:
     with engine.connect() as conn:
@@ -263,6 +312,9 @@ def mark_forward_tests(engine, ds: Dataset, state_at_fn, latest_block: int,
                        "fees_a": m["fees_a"], "gas_cost": m["gas_cost"], "vs_hodl_a": m["vs_hodl_a"],
                        "vs_passive_a": (m["net_a"] - pm["net_a"]) if pm else None,
                        "rebalances": m["rebalances"], "ruined": m["ruined"],
+                       "il": m["il_realized"] + m["il_unrealized"], "swap_cost": m["swap_cost"],
+                       "time_in_range": m["time_in_range"], "fees_b": m["fees_b"],
+                       **_entry_and_now(r, ds.decimals0 - ds.decimals1),
                        "label": "MODELED (forward test on data unseen at registration)"}
             with engine.begin() as conn:
                 conn.execute(S.forward_tests.update().where(S.forward_tests.c.id == t.id).values(

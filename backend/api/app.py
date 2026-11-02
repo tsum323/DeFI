@@ -49,6 +49,11 @@ def signals():
     return Q.signals(engine)
 
 
+@app.get("/api/opportunities")
+def opportunities():
+    return Q.opportunities(engine)
+
+
 @app.get("/api/portfolio")
 def portfolio():
     return Q.portfolio(engine)
