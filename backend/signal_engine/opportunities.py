@@ -152,7 +152,7 @@ def opportunity(ds, state, snap: MarketSnapshot, cand: Candidate, tier: str, blo
         "expected_net_vs_hodl_usd": net_vs_hodl, "expected_net_mid_usd": mid,
         "expected_net_mid_pct": mid / capital if capital else None,
         "net_forecast_usd": p["net_forecast_usd"], "il_scenarios": p["il_scenarios"],
-        "exit_probability": p_exit, "risk": risk, "risk_why": risk_why,
+        "exit_probability": p_exit, "risk": risk, "risk_why": risk_why, "sigma_horizon": sigma,
         "confidence": ("high" if tier == "CONSERVATIVE" and cand.confidence == "high" else
                        "medium" if tier in ("CONSERVATIVE", "MODERATE") else "low"),
         "historical": {**p["historical"], "robustness_score": robustness, **hist},

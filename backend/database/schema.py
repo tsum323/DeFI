@@ -9,7 +9,7 @@ re-ingesting a window is idempotent.
 from __future__ import annotations
 
 from sqlalchemy import (
-    BigInteger, Boolean, Column, Integer, MetaData, String, Table, Text,
+    BigInteger, Boolean, Column, Float, Integer, MetaData, String, Table, Text,
     create_engine, event,
 )
 from sqlalchemy.engine import Engine
@@ -285,6 +285,112 @@ opportunity_events = Table(  # history: a strategy enters, changes or leaves a t
     Column("strategy", String(128), nullable=False),
     Column("tier_from", String(16)),
     Column("tier_to", String(16)),
+    Column("details_json", Text),
+)
+
+# ------------------------------------------------------------ UNISWAP AI LAB: market scanner
+pool_hours = Table(  # hourly aggregates of Swap events of every scanned pool (token units)
+    "pool_hours", metadata,
+    Column("pool", String(64), primary_key=True),
+    Column("hour_ts", BigInteger, primary_key=True),
+    Column("swaps", Integer, nullable=False),
+    Column("vol0", Float, nullable=False),          # |amount0| summed, human token0 units
+    Column("vol1", Float, nullable=False),
+    Column("fee0", Float, nullable=False),          # fee charged on token0 inputs (amountIn x fee)
+    Column("fee1", Float, nullable=False),
+    Column("close_sqrt_price", Text, nullable=False),  # after the last swap of the hour (EXACT)
+    Column("close_tick", Integer, nullable=False),
+    Column("close_liquidity", Text, nullable=False),   # active liquidity after the last swap
+    Column("last_block", BigInteger, nullable=False),
+)
+
+scan_state = Table(
+    "scan_state", metadata,
+    Column("stream", String(32), primary_key=True),
+    Column("first_block", BigInteger, nullable=False),
+    Column("last_block", BigInteger, nullable=False),
+    Column("updated_at", BigInteger, nullable=False),
+)
+
+scan_results = Table(  # latest market scan (pool ranking with range estimates)
+    "scan_results", metadata,
+    Column("id", Integer, primary_key=True, autoincrement=True),
+    Column("created_at", BigInteger, nullable=False),
+    Column("block", BigInteger, nullable=False),
+    Column("payload_json", Text, nullable=False),
+)
+
+# ------------------------------------------------------------ UNISWAP AI LAB: self-learning
+forecasts = Table(  # what the model predicted when a virtual position was opened
+    "forecasts", metadata,
+    Column("id", Integer, primary_key=True, autoincrement=True),
+    Column("created_at", BigInteger, nullable=False),
+    Column("forward_test_id", Integer, nullable=False, index=True),
+    Column("spec_hash", String(64), nullable=False),
+    Column("strategy", String(128), nullable=False),
+    Column("tier", String(16)),
+    Column("horizon_days", Integer, nullable=False),
+    Column("forecast_json", Text, nullable=False),
+    Column("status", String(12), nullable=False),     # open | reviewed
+    Column("checkpoint_json", Text),                  # latest interim comparison
+    Column("review_json", Text),                      # final comparison at the horizon
+    Column("reviewed_at", BigInteger),
+)
+
+lessons = Table(  # conclusions drawn from forecast errors (and what was done about them)
+    "lessons", metadata,
+    Column("id", Integer, primary_key=True, autoincrement=True),
+    Column("created_at", BigInteger, nullable=False),
+    Column("forecast_id", Integer),
+    Column("spec_hash", String(64)),
+    Column("strategy", String(128)),
+    Column("reasons_json", Text, nullable=False),
+    Column("action", Text, nullable=False),
+)
+
+# ------------------------------------------------------------ UNISWAP AI LAB: virtual portfolio
+portfolio_positions = Table(  # virtual positions with their own history (never deleted)
+    "portfolio_positions", metadata,
+    Column("id", Integer, primary_key=True, autoincrement=True),
+    Column("opened_at", BigInteger, nullable=False),
+    Column("kind", String(12), nullable=False),        # exact (pool replay) | estimated (hourly)
+    Column("tier", String(16), nullable=False),
+    Column("pool", String(64), nullable=False),
+    Column("pair", String(32), nullable=False),
+    Column("strategy", String(128), nullable=False),
+    Column("spec_hash", String(64)),
+    Column("forward_test_id", Integer),                # exact: the simulation behind it
+    Column("allocation_usd", Float, nullable=False),
+    Column("entry_json", Text, nullable=False),        # price, range, amounts, forecast at entry
+    Column("status", String(8), nullable=False),       # open | closed
+    Column("mark_json", Text),                         # latest valuation
+    Column("out_of_ranking_since", BigInteger),
+    Column("closed_at", BigInteger),
+    Column("close_reason", Text),
+)
+
+portfolio_history = Table(  # one row per day: balance and its components
+    "portfolio_history", metadata,
+    Column("day", String(10), primary_key=True),
+    Column("created_at", BigInteger, nullable=False),
+    Column("payload_json", Text, nullable=False),
+)
+
+lab_state = Table(  # small named parameters the system learns (with history in `activity`)
+    "lab_state", metadata,
+    Column("key", String(64), primary_key=True),
+    Column("value_json", Text, nullable=False),
+    Column("updated_at", BigInteger, nullable=False),
+)
+
+# ------------------------------------------------------------ UNISWAP AI LAB: activity log
+activity = Table(  # what the system did, in plain language, with status (ok|warn|error|info)
+    "activity", metadata,
+    Column("id", Integer, primary_key=True, autoincrement=True),
+    Column("created_at", BigInteger, nullable=False, index=True),
+    Column("kind", String(32), nullable=False),
+    Column("status", String(8), nullable=False),
+    Column("message", Text, nullable=False),
     Column("details_json", Text),
 )
 

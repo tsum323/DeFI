@@ -1,6 +1,10 @@
 {
  "optuna": "optuna.sqlite",
  "tables": {
+  "activity": {
+   "rows": 5,
+   "sha256": "12ee26d776271844272b9d7b71542a7226aa8115a58bf3974845c528938c487e"
+  },
   "datasets": {
    "rows": 43,
    "sha256": "a7cc089d5e8b3cc2afefae0b89b9caede01b1954764851d2f8ee956694714c4e"
@@ -8,6 +12,10 @@
   "experiments": {
    "rows": 22695,
    "sha256": "7bd2cc8ac96c104a488608934fb20daaa10e0b70929747c5320e47b0497a1e44"
+  },
+  "forecasts": {
+   "rows": 0,
+   "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
   },
   "forward_tests": {
    "rows": 15,
@@ -25,6 +33,14 @@
    "rows": 9,
    "sha256": "e04134c1b590548dce6cad510bb8efaa2b04549d8833b0bbf085b2ee7f8af8b3"
   },
+  "lab_state": {
+   "rows": 0,
+   "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "lessons": {
+   "rows": 0,
+   "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
   "market_evaluations": {
    "rows": 51,
    "sha256": "ff8b0caee0567b8979223ae57dcf397a767f4a8a9c21a952b1c7230f11e33599"
@@ -36,6 +52,26 @@
   "opportunity_rankings": {
    "rows": 1,
    "sha256": "e41981ec77092b58e85cbb28e159ce24f21cc7a94e2bfb9b159e8fe04b842fea"
+  },
+  "pool_hours": {
+   "rows": 5385,
+   "sha256": "dd0ebac3e1e5dd5237e80e2bf29afab83f4bfe595adb08d00e34475891d34cc1"
+  },
+  "portfolio_history": {
+   "rows": 0,
+   "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "portfolio_positions": {
+   "rows": 0,
+   "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "scan_results": {
+   "rows": 1,
+   "sha256": "fe0ffbcf1d3e80bf0d3864183f398ee99d66bc584c0456676f07869daa5efe9f"
+  },
+  "scan_state": {
+   "rows": 1,
+   "sha256": "b7050e03ab132261a37e2ad4f3653a246a663fb42ee3393a1c83cbde9db1e287"
   },
   "signal_events": {
    "rows": 3,

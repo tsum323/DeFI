@@ -44,17 +44,61 @@ pools:
     tick_spacing: 10
     address: "0x9a772018FbD77fcD2d25657e5C547BAfF3Fd7D16"
     status: derived_create2
-  # Planned extensions (architecture ready, not researched in MVP):
+  # Market scanner pools (UNISWAP AI LAB). USDC < WETH and WBTC < WETH by address.
+  weth_usdc_100:
+    network: ethereum
+    protocol: uniswap_v3
+    token0: USDC
+    token1: WETH
+    fee: 100
+    tick_spacing: 1
+    address: "0xE0554a476A092703abdB3Ef35c80e0D76d32939F"
+    status: verified_onchain   # factory.getPool == CREATE2 derivation (2026-11-03)
   weth_usdc_500:
     network: ethereum
     protocol: uniswap_v3
-    token0: USDC          # NOTE: here USDC < WETH by address, so USDC is token0
+    token0: USDC
     token1: WETH
     fee: 500
     tick_spacing: 10
     address: "0x88e6A0c2dDD26FEEb64F039a2c41296FcB3f5640"
-    status: derived_create2
-    enabled: false
+    status: verified_onchain   # factory.getPool == CREATE2 derivation (2026-11-03)
+  weth_usdc_3000:
+    network: ethereum
+    protocol: uniswap_v3
+    token0: USDC
+    token1: WETH
+    fee: 3000
+    tick_spacing: 60
+    address: "0x8ad599c3A0ff1De082011EFDDc58f1908eb6e6D8"
+    status: verified_onchain   # factory.getPool == CREATE2 derivation (2026-11-03)
+  wbtc_weth_100:
+    network: ethereum
+    protocol: uniswap_v3
+    token0: WBTC
+    token1: WETH
+    fee: 100
+    tick_spacing: 1
+    address: "0xe6ff8b9A37B0fab776134636D9981Aa778c4e718"
+    status: verified_onchain   # factory.getPool == CREATE2 derivation (2026-11-03)
+  wbtc_weth_500:
+    network: ethereum
+    protocol: uniswap_v3
+    token0: WBTC
+    token1: WETH
+    fee: 500
+    tick_spacing: 10
+    address: "0x4585FE77225b41b697C938B018E2Ac67Ac5a20c0"
+    status: verified_onchain   # factory.getPool == CREATE2 derivation (2026-11-03)
+  wbtc_weth_3000:
+    network: ethereum
+    protocol: uniswap_v3
+    token0: WBTC
+    token1: WETH
+    fee: 3000
+    tick_spacing: 60
+    address: "0xCBCdF9626bC03E24f779434178A73a0B4bad62eD"
+    status: verified_onchain   # factory.getPool == CREATE2 derivation (2026-11-03)
 
 research:
   primary_pool: wbtc_usdc_3000   # final choice after stage-2 activity comparison (3000 vs 500)

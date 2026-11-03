@@ -63,3 +63,20 @@ scheduler:
     research:        {every_minutes: 1440,  heavy: true,  cmd: ["scripts.run_research"], needs_env: ANTHROPIC_API_KEY}
     report:          {every_minutes: 1440,  heavy: false, cmd: ["scripts.report"]}
     save_snapshot:   {every_minutes: 1440,  heavy: false, cmd: ["scripts.data_snapshot", "export-research"]}
+
+# UNISWAP AI LAB: market scanner (backend/lab/scanner.py)
+scanner:
+  pools: [wbtc_usdc_3000, wbtc_usdc_500, weth_usdc_100, weth_usdc_500, weth_usdc_3000,
+          wbtc_weth_100, wbtc_weth_500, wbtc_weth_3000]
+  backfill_days: 30          # first run only; afterwards only new blocks
+  endpoint: drpc             # archive, free; 100-block eth_getLogs windows, batches of 3
+
+# UNISWAP AI LAB: virtual portfolio (backend/lab/portfolio.py). Change the capital here
+# (on GitHub: open this file, pencil icon, edit, "Commit changes") — the next update uses it.
+portfolio:
+  virtual_capital_usd: 10000
+  allocation: {CONSERVATIVE: 0.30, MODERATE: 0.15, EXPERIMENTAL: 0.05}   # of the capital
+  max_open: 8
+  max_days: 30                      # a virtual position is closed and evaluated after this
+  close_after_hours_out_of_ranking: 72
+
