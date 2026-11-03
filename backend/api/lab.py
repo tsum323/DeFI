@@ -307,10 +307,12 @@ def research(engine) -> dict:
 
 def _bot_brief(engine, cfg) -> dict:
     from backend.lab.bot import summary
+    from backend.lab.scanner import NETWORK_RU
     b = summary(engine, cfg)
     cur = b["current"]
     return {"balance_usd": b["balance_usd"], "pnl_usd": b["pnl_usd"], "start_usd": b["start_usd"],
-            "where": f"{cur['pair']} · {cur['network']}" if cur else "ждёт подходящего варианта"}
+            "where": (f"{cur['pair']} · {NETWORK_RU.get(cur['network'], cur['network'])}" if cur
+                      else "ждёт подходящего варианта")}
 
 
 def bot(engine, cfg) -> dict:
@@ -345,9 +347,15 @@ def dashboard(engine, cfg) -> dict:
     best = best[:4]
     stale = last is None or now - last > 3 * 3600
     return {
-        "status": "error" if errors and len(errors) >= 3 else "stale" if stale else "ok",
+        "status": ("error" if sum(1 for e in errors if not any(a["kind"] == e["kind"] and a["status"] == "ok"
+                                                                and a["at"] > e["at"] for a in day)) >= 1
+                   else "stale" if stale else "ok"),
         "status_text": ("Система работает: последнее действие " if not stale else "Давно не было действий: ") ,
-        "last_action_at": last, "errors_24h": [e["message"] for e in errors][:5],
+        "last_action_at": last,
+        # an error is "resolved" when the same step has since run successfully
+        "errors_24h": [{"at": e["at"], "message": e["message"],
+                        "resolved": any(a["kind"] == e["kind"] and a["status"] == "ok" and a["at"] > e["at"] for a in day)}
+                       for e in errors][:6],
         "data": {"pool_block": ss.last_block if ss else None, "scanner_block": sc.last_block if sc else None},
         "strict": sig["strict"], "counts": {t: sum(1 for c in sig["cards"] if c["tier"] == t)
                                              for t in ("CONSERVATIVE", "MODERATE", "EXPERIMENTAL")},

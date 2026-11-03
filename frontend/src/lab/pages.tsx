@@ -33,7 +33,9 @@ export function Dashboard() {
         <Stat title="За сутки" label="MODELED" value={p.day_change_usd == null ? "—" : usd(p.day_change_usd, 2)} tone={sign(p.day_change_usd)}
           hint="изменение баланса портфеля" />
       </div>
-      {d.errors_24h.length > 0 && <Card title="Ошибки за сутки"><ul>{d.errors_24h.map((e: string) => <li key={e} className="neg">{e}</li>)}</ul></Card>}
+      {d.errors_24h.length > 0 && <Card title={d.errors_24h.some((e: Any) => !e.resolved) ? "Ошибки за сутки" : "Ошибки за сутки — уже исправлены"}>
+        <ul>{d.errors_24h.map((e: Any, i: number) => <li key={i} className={e.resolved ? "muted" : "neg"}>{date(e.at).replace(/^.*?г\.,?\s*/, "")} · {e.message}
+          {e.resolved && <> — после этого шаг выполнялся успешно</>}</li>)}</ul></Card>}
       <Card title="Лучшие варианты сейчас" right={<Badge label="SCENARIO" />}>
         {d.best.length === 0 ? <p className="muted">Интересных вариантов сейчас нет — система продолжает исследование.</p> :
           <ul>{d.best.map((c: CardT) => <li key={c.id}><b>{c.pair}</b> {pctAbs(c.fee_tier, 2)} · {c.network_ru ?? "Ethereum"} · {TIER_RU[c.tier].name.toLowerCase()} ·
