@@ -47,3 +47,23 @@ def test_lab_api_sections_on_empty_database(tmp_path, monkeypatch):
     assert L.signals(engine)["cards"] == [] and "потере" in L.signals(engine)["risk_warning"]
     assert L.portfolio(engine, cfg)["balance_usd"] == cfg.lab["portfolio"]["virtual_capital_usd"]
     assert L.research(engine)["hypotheses"] == [] and L.activity(engine)["items"] == []
+
+
+def test_best_of_day_and_entry_price_guide():
+    from backend.api.lab import add_entry_prices, best_today
+
+    def card(i, pair, tier, net, src="estimated", price=100.0, pool="p"):
+        return {"id": i, "pair": pair, "tier": tier, "net_usd": net, "source": src, "price": price,
+                "pool": pool, "quote": "USDC", "base": pair.split("/")[0]}
+    cards = [card("a", "WBTC/USDC", "MODERATE", [1, 9], "exact"), card("b", "WBTC/USDC", "EXPERIMENTAL", [2, 20], "exact"),
+             card("c", "WETH/USDC", "EXPERIMENTAL", [3, 5]), card("d", "WETH/USDC", "EXPERIMENTAL", [-9, -1]),
+             card("e", "WBTC/WETH", "EXPERIMENTAL", [-5, -1])]
+    assert best_today(cards) == ["a", "b", "c"]        # one per pair + a second tier; never a negative one
+    scan = {"pools": [{"pool": "p", "pair": "WBTC/USDC", "price": 100.0, "vwap_7d": 110.0, "low_7d": 90.0, "high_7d": 120.0,
+                       "fee_tier": 0.003, "volume_usd": {"7d": 1e6}, "base_usd": 100.0, "quote_usd": 1.0}]}
+    low = [card("a", "WBTC/USDC", "MODERATE", [1, 9], price=100.0)]
+    add_entry_prices(low, scan)
+    assert low[0]["entry"]["recommended"] == 100.0 and "ниже средней" in low[0]["entry"]["verdict"]
+    high = [card("a", "WBTC/USDC", "MODERATE", [1, 9], price=121.0)]
+    add_entry_prices(high, scan)
+    assert high[0]["entry"]["recommended"] == 110.0 and "подождать" in high[0]["entry"]["verdict"]

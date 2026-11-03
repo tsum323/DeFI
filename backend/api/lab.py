@@ -127,13 +127,71 @@ def signals(engine) -> dict:
         c = _scan_card(p, scan)
         if c and p.get("score") is not None and c["net_usd"][1] > 0:
             cards.append(c)
+    add_entry_prices(cards, scan)
     bad = [{"pair": p["pair"], "fee_tier": p["fee_tier"], "problems": p["problems"] + p["data_quality"]}
            for p in scan.get("pools", []) if p["problems"] or p["data_quality"]]
-    return {"strict": _strict(engine), "cards": cards, "tier_share": TIER_SHARE,
+    return {"strict": _strict(engine), "cards": cards, "best_today": best_today(cards), "tier_share": TIER_SHARE,
             "market": ranking.get("market"), "market_checks": ranking.get("market_checks", []),
             "diagnostics": ranking.get("diagnostics", []), "pools_with_problems": bad,
             "scan_at": scan.get("created_at"), "ranking_at": ranking.get("created_at"),
             "risk_warning": RISK_TEXT["general"]}
+
+
+TIER_ORDER = {"CONSERVATIVE": 0, "MODERATE": 1, "EXPERIMENTAL": 2}
+
+
+def _mid(c: dict) -> float:
+    return (c["net_usd"][0] + c["net_usd"][1]) / 2
+
+
+def best_today(cards: list[dict], n: int = 4) -> list[str]:
+    """Ids of the day's best choices: the best (most proven, then highest expected result
+    with a positive lower bound preferred) card of every pair; for the exactly modelled
+    pool also the best of a second tier, so there is a safer and a bolder option."""
+    out, seen = [], set()
+    ordered = sorted(cards, key=lambda c: (TIER_ORDER[c["tier"]], c["net_usd"][0] <= 0, -_mid(c)))
+    for c in ordered:
+        if c["pair"] not in seen and _mid(c) > 0:
+            seen.add(c["pair"])
+            out.append(c)
+    exact = [c for c in ordered if c["source"] == "exact" and c not in out and _mid(c) > 0]
+    first = next((c for c in out if c["source"] == "exact"), None)
+    second = next((c for c in exact if first is None or c["tier"] != first["tier"]), None)
+    if second:
+        out.append(second)
+    return [c["id"] for c in sorted(out, key=lambda c: (TIER_ORDER[c["tier"]], -_mid(c)))[:n]]
+
+
+def add_entry_prices(cards: list[dict], scan: dict) -> None:
+    """Entry price guide per card from the pair's most traded pool (EXACT swap sums):
+    7-day average price weighted by volume, weekly low/high, and how far this pool's price
+    is from that reference (a large gap would mean buying at a worse price than elsewhere)."""
+    pools = scan.get("pools", [])
+    ref: dict = {}
+    for p in pools:
+        if p.get("vwap_7d") and (p["pair"] not in ref or p["volume_usd"]["7d"] > ref[p["pair"]]["volume_usd"]["7d"]):
+            ref[p["pair"]] = p
+    by_pool = {p["pool"]: p for p in pools}
+    for c in cards:
+        r, own = ref.get(c["pair"]), by_pool.get(c["pool"])
+        c["base_usd"] = own.get("base_usd") if own else None
+        c["quote_usd"] = own.get("quote_usd") if own else None
+        if r is None:
+            c["entry"] = None
+            continue
+        avg = r["vwap_7d"]
+        dev = c["price"] / r["price"] - 1
+        rec = min(c["price"], avg)
+        c["entry"] = {
+            "now": c["price"], "average_7d": avg, "low_7d": r["low_7d"], "high_7d": r["high_7d"],
+            "recommended": rec, "reference_pool": f"{r['pair']} {r['fee_tier']:.2%}", "reference_price": r["price"],
+            "pool_vs_market": dev,
+            "verdict": ("сейчас цена ниже средней за неделю — входить по текущей цене выгоднее средней"
+                        if c["price"] <= avg else
+                        f"сейчас цена выше средней за неделю на {c['price'] / avg - 1:.1%} — выгоднее подождать "
+                        f"снижения до ~{avg:,.4g} (не гарантия, что цена туда вернётся)"),
+            "assumption": f"считаем, что вы входите с {c['quote']} и докупаете {c['base']} — тогда выгоднее входить, когда {c['base']} дешевле",
+            "label": "EXACT"}
 
 
 def portfolio(engine, cfg) -> dict:

@@ -89,3 +89,5 @@ details[open] > summary { margin-bottom: 6px; }
 .tabs { display: flex; gap: 6px; flex-wrap: wrap; margin: 4px 0 12px; }
 .log-item { display: grid; grid-template-columns: 112px 1fr; gap: 8px; padding: 6px 0; border-bottom: 1px solid var(--line); font-size: 13px; }
 @media (max-width: 640px) { .log-item { grid-template-columns: 1fr; } .kv { grid-template-columns: 1fr; } }
+button.card.pick { display: block; width: 100%; text-align: left; color: inherit; font: inherit; cursor: pointer; }
+button.card.pick.picked { border-color: var(--gold); box-shadow: 0 0 0 1px var(--gold) inset; }

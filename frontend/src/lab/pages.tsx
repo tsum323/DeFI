@@ -10,9 +10,6 @@ const STATUS_TONE: Record<string, string> = { ok: "pos", warn: "warn", error: "n
 const KIND_RU: Record<string, string> = { data: "данные", scan: "сканер", portfolio: "портфель", learning: "обучение",
   calibration: "калибровка", research: "исследование", report: "отчёт" };
 
-function readCapital(): number | null {
-  try { const v = Number(localStorage.getItem("real_capital")); return v > 0 ? v : null; } catch { return null; }
-}
 
 // ---------------------------------------------------------------- Dashboard
 export function Dashboard() {
@@ -55,47 +52,143 @@ export function Dashboard() {
 }
 
 // ---------------------------------------------------------------- Signals
+// The day's best strategies -> pick one, enter the amount, choose the entry price.
+function useStored(key: string, initial: string): [string, (v: string) => void] {
+  const [v, setV] = useState<string>(() => { try { return localStorage.getItem(key) ?? initial; } catch { return initial; } });
+  return [v, (x: string) => { setV(x); try { localStorage.setItem(key, x); } catch { /* private mode */ } }];
+}
+
+// Uniswap v3 position in base/quote terms (price = quote per 1 base), float math.
+function plan(c: CardT, amountUsd: number, entry: number) {
+  const lr = c.price_lower / c.price, ur = c.price_upper / c.price;
+  const P = entry, Pa = P * lr, Pb = P * ur, sp = Math.sqrt(P), sa = Math.sqrt(Pa), sb = Math.sqrt(Pb);
+  const quoteUsd = c.quote_usd ?? 1;
+  const perL = (1 / sp - 1 / sb) * P + (sp - sa);                 // value of L = 1 in quote
+  const L = amountUsd / quoteUsd / perL;
+  const x = L * (1 / sp - 1 / sb), y = L * (sp - sa);              // base, quote amounts
+  const valueAt = (p: number) => {
+    const s = Math.sqrt(p);
+    const [bx, by] = s <= sa ? [L * (1 / sa - 1 / sb), 0] : s >= sb ? [0, L * (sb - sa)] : [L * (1 / s - 1 / sb), L * (s - sa)];
+    return (bx * p + by) * quoteUsd;
+  };
+  const k = amountUsd / c.deposit_usd;
+  const baseShare = (x * P) / (x * P + y);
+  const fees: [number, number] = [c.fees_usd[0] * k, c.fees_usd[1] * k];
+  const swap = amountUsd * baseShare * c.fee_tier;                // buying the base part from cash
+  const il = c.il_usd * k;
+  const net: [number, number] = [fees[0] + il - c.gas_usd - swap, fees[1] + il - c.gas_usd - swap];
+  const scen = [-0.2, -0.1, 0.1, 0.2].map((ch) => {
+    const p = P * (1 + ch), lp = valueAt(p), hold = (x * p + y) * quoteUsd;
+    return { change: ch, position: lp - amountUsd, vsHold: lp - hold, hold: hold - amountUsd };
+  });
+  const perDollar = ((fees[0] + fees[1]) / 2 + il - swap) / amountUsd;
+  return { Pa, Pb, x, y, baseShare, fees, swap, il, net, scen, breakEven: perDollar > 0 ? c.gas_usd / perDollar : null };
+}
+
+const fp = (x: number) => num(x, x >= 1000 ? 0 : x >= 10 ? 2 : 4);
+
 export function Signals() {
   const { data: d, error } = useApi<Any>("/api/lab/signals");
-  const [capital, setCapital] = useState<number | null>(readCapital());
-  const [tier, setTier] = useState<string>("all");
-  const [sort, setSort] = useState<string>("tier");
+  const [picked, setPicked] = useStored("picked_card", "");
+  const [amountS, setAmountS] = useStored("invest_amount", "1000");
+  const [mode, setMode] = useState<"now" | "rec" | "own">("now");
+  const [own, setOwn] = useState("");
   if (!d) return <Loading error={error} />;
-  const save = (v: string) => { const n = Number(v.replace(/\s/g, "")); setCapital(n > 0 ? n : null);
-    try { n > 0 ? localStorage.setItem("real_capital", String(n)) : localStorage.removeItem("real_capital"); } catch { /* private mode */ } };
-  const order: Record<string, number> = { CONSERVATIVE: 0, MODERATE: 1, EXPERIMENTAL: 2 };
-  const rk: Record<string, number> = { low: 0, medium: 1, high: 2 };
-  const cards = (d.cards as CardT[]).filter((c) => tier === "all" || c.tier === tier).sort((a, b) =>
-    sort === "net" ? (b.net_usd[0] + b.net_usd[1]) - (a.net_usd[0] + a.net_usd[1]) :
-    sort === "risk" ? rk[a.risk] - rk[b.risk] || order[a.tier] - order[b.tier] :
-    order[a.tier] - order[b.tier] || (b.net_usd[0] + b.net_usd[1]) - (a.net_usd[0] + a.net_usd[1]));
+  const cards = d.cards as CardT[];
+  const best = (d.best_today as string[]).map((id) => cards.find((c) => c.id === id)).filter(Boolean) as CardT[];
+  const c = cards.find((x) => x.id === picked) ?? best[0];
+  const amount = Math.max(0, Number(amountS.replace(/\s/g, "")) || 0);
+  const e = c?.entry;
+  const entry = !c ? 0 : mode === "rec" && e ? e.recommended : mode === "own" && Number(own) > 0 ? Number(own) : c.price;
+  const r = c && amount > 0 ? plan(c, amount, entry) : null;
+  const t0 = c?.token0 === c?.base;
   return (
     <>
       <h1>Сигналы <Badge label="SCENARIO" /></h1>
-      <Card title={`Строгий сигнал: ${STATUS_RU[d.strict.status] ?? d.strict.status}`}>
-        <p>{d.strict.text}</p>
-      </Card>
-      <Card title="Ваш капитал для ликвидности (REAL CAPITAL)">
-        <div className="capital"><input inputMode="numeric" placeholder="например 5000" defaultValue={capital ?? ""}
-          onChange={(e) => save(e.target.value)} /> <span>USD</span></div>
-        <p className="muted">Хранится только в этом браузере. Система не использует весь капитал: предлагается доля по уровню
-          проверки — проверенный до {pctAbs(d.tier_share.CONSERVATIVE, 0)}, умеренный до {pctAbs(d.tier_share.MODERATE, 0)},
-          экспериментальный до {pctAbs(d.tier_share.EXPERIMENTAL, 0)}. Не вкладывайте всё в одну позицию.</p>
-      </Card>
+      <p className="lead">Строгий сигнал: <b>{STATUS_RU[d.strict.status] ?? d.strict.status}</b>. {d.strict.text}</p>
+
+      <h2 className="section">1. Лучшие стратегии на {date(d.ranking_at ?? d.scan_at).split(",")[0]}</h2>
+      {best.length === 0 ? <Card><p>Сегодня подходящих вариантов нет — система не создаёт сигналы ради заполнения экрана.</p></Card> :
+        best.map((b) => (
+          <button key={b.id} className={`card pick${c?.id === b.id ? " picked" : ""}`} onClick={() => setPicked(b.id)}>
+            <div className="card-head"><h2>{b.pair} · {pctAbs(b.fee_tier, 2)}</h2>
+              <div className="card-right"><Pill tone={TIER_RU[b.tier].tone}>{TIER_RU[b.tier].name}</Pill>
+                <Pill tone={b.risk === "low" ? "pos" : b.risk === "medium" ? "warn" : "neg"}>риск {RISK_RU[b.risk]}</Pill><Badge label={b.label} /></div></div>
+            <p>{b.strategy_ru ?? b.strategy}</p>
+            <p className="muted">Диапазон {fp(b.price_lower)} – {fp(b.price_upper)} {b.quote} · за {b.horizon_days} дн. на $1 000:{" "}
+              <span className={sign(b.net_usd[0] + b.net_usd[1])}>{usd(b.net_usd[0] / b.deposit_usd * 1000, 2)} … {usd(b.net_usd[1] / b.deposit_usd * 1000, 2)}</span> к хранению
+              {c?.id === b.id && <b className="pos"> · выбрано</b>}</p>
+          </button>))}
+
+      {c && <>
+        <h2 className="section">2. Сколько вы готовы вложить</h2>
+        <Card><div className="capital"><input inputMode="decimal" value={amountS} onChange={(ev) => setAmountS(ev.target.value)} /> <span>USD</span></div>
+          <p className="muted">Всё ниже посчитано на эту сумму. Не вкладывайте деньги, потерю которых не можете себе позволить.</p></Card>
+
+        <h2 className="section">3. Цена входа (1 {c.base} в {c.quote})</h2>
+        <Card>
+          <div className="tabs">
+            <button className={`pill${mode === "now" ? " warn" : ""}`} onClick={() => setMode("now")}>текущая {fp(c.price)}</button>
+            {e && e.recommended < c.price && <button className={`pill${mode === "rec" ? " warn" : ""}`} onClick={() => setMode("rec")}>рекомендуемая {fp(e.recommended)}</button>}
+            {e && e.recommended >= c.price && <span className="pill pos">текущая цена ниже средней за неделю — она и есть рекомендуемая</span>}
+            <button className={`pill${mode === "own" ? " warn" : ""}`} onClick={() => setMode("own")}>своя</button>
+            {mode === "own" && <span className="capital"><input inputMode="decimal" placeholder={fp(c.price)} value={own} onChange={(ev) => setOwn(ev.target.value)} /></span>}
+          </div>
+          {e ? <>
+            <p>{e.verdict}.</p>
+            <p className="muted">Средняя цена за неделю (по объёму сделок) {fp(e.average_7d)} · минимум {fp(e.low_7d)} · максимум {fp(e.high_7d)} ({e.reference_pool}). {e.assumption}.</p>
+            {Math.abs(e.pool_vs_market) > 0.003 && <p className="warn">Цена в этом пуле отличается от основного рынка на {pct(e.pool_vs_market, 2)} — проверьте цену перед входом.</p>}
+          </> : <p className="muted">Нет данных о средней цене.</p>}
+          {mode !== "now" && <p className="muted">Если выбираете не текущую цену — открывайте позицию, когда цена в Uniswap дойдёт до {fp(entry)}. Диапазон ниже уже сдвинут к этой цене.</p>}
+        </Card>
+
+        {r && <>
+          <h2 className="section">4. Расчёт на {usd(amount)}</h2>
+          <Card right={<Badge label={c.label} />}>
+            <p className="hero">Диапазон: <b>{fp(r.Pa)} – {fp(r.Pb)} {c.quote}</b> за 1 {c.base}<br />
+              Внести: <b>{num(r.x, c.base === "USDC" ? 2 : 6)} {c.base}</b> + <b>{num(r.y, c.quote === "USDC" ? 2 : 6)} {c.quote}</b> ({pctAbs(1 - r.baseShare, 0)} в {c.quote})<br />
+              За {c.horizon_days} дн. по сравнению с простым хранением: <b className={sign(r.net[0] + r.net[1])}>{usd(r.net[0], 2)} … {usd(r.net[1], 2)}</b> — оценка модели, не гарантия</p>
+            <div className="kv">
+              <span>Комиссии (доход)</span><span>{usd(r.fees[0], 2)} – {usd(r.fees[1], 2)}</span>
+              <span>Потеря к хранению при обычном движении цены</span><span>{usd(r.il, 2)}</span>
+              <span>Газ (открыть + закрыть)</span><span>{usd(c.gas_usd, 2)}</span>
+              <span>Обмен части {c.quote} на {c.base}</span><span>{usd(r.swap, 2)}</span>
+              <span>Шанс, что цена выйдет из диапазона за {c.horizon_days} дн.</span><span>{pctAbs(c.exit_probability, 0)}</span>
+              {r.breakEven != null && <><span>Минимальная разумная сумма</span><span className={amount < r.breakEven ? "warn" : ""}>~{usd(r.breakEven)} (иначе газ съедает доход)</span></>}
+            </div>
+            <h3>Если цена изменится</h3>
+            <div className="table-wrap"><table className="table"><thead><tr><th>Цена {c.base}</th><th>Ваша позиция</th><th>Если бы просто держали</th><th>Разница</th></tr></thead>
+              <tbody>{r.scen.map((s) => <tr key={s.change}><td>{pct(s.change, 0)} ({fp(entry * (1 + s.change))})</td>
+                <td className={sign(s.position)}>{usd(s.position, 2)}</td><td className={sign(s.hold)}>{usd(s.hold, 2)}</td>
+                <td className={sign(s.vsHold)}>{usd(s.vsHold, 2)}</td></tr>)}</tbody></table></div>
+            <p className="muted">В таблице без комиссий. Когда цена выходит за диапазон, позиция целиком становится одной монетой и комиссии прекращаются.</p>
+          </Card>
+
+          <Card title="Почему этот вариант и что может пойти не так">
+            <p><b>Почему:</b> {c.why.join("; ")}.</p>
+            <p><b>Главный риск:</b> {c.risk_why}.</p>
+            {c.blockers.length > 0 && <p><b>Чего не хватает до более надёжного уровня:</b> {c.blockers.join("; ")}.</p>}
+            <p><b>Отменить, если:</b> {c.invalidation.join("; ")}. Сигнал действует до {date(c.valid_until)}.</p>
+            {c.token_risks && <p className="muted">{c.token_risks.join(" ")}</p>}
+          </Card>
+
+          <Card title="5. Как открыть на Uniswap (делаете вы сами)">
+            <ol>
+              <li>Откройте <b>app.uniswap.org</b> (набирайте адрес вручную) и подключите свой кошелёк.</li>
+              <li>Раздел «Pool» → «New position» → сеть <b>Ethereum</b>.</li>
+              <li>Пара <b>{c.token0} / {c.token1}</b>, комиссия <b>{pctAbs(c.fee_tier, 2)}</b>. Адрес пула для проверки: <code>{c.pool_address}</code>.</li>
+              <li>Диапазон: min <b>{fp(t0 ? r.Pa : 1 / r.Pb)}</b>, max <b>{fp(t0 ? r.Pb : 1 / r.Pa)}</b> {t0 ? `${c.token1} за 1 ${c.token0}` : `${c.token1} за 1 ${c.token0}`}
+                {!t0 && <> (в Uniswap можно переключить отображение на «{c.quote} за 1 {c.base}»: {fp(r.Pa)} – {fp(r.Pb)})</>}.</li>
+              <li>Суммы: <b>{num(r.x, 6)} {c.base}</b> и <b>{num(r.y, c.quote === "USDC" ? 2 : 6)} {c.quote}</b> (Uniswap подставит вторую сумму сам).</li>
+              <li>Проверьте газ в кошельке и подтвердите. Никому не сообщайте секретную фразу.</li>
+            </ol>
+          </Card>
+        </>}
+      </>}
+
       <div className="warnbox">{d.risk_warning}</div>
-      <div className="tabs" style={{ marginTop: 12 }}>
-        {[["all", "все"], ["CONSERVATIVE", "проверенные"], ["MODERATE", "умеренные"], ["EXPERIMENTAL", "экспериментальные"]].map(([k, t]) =>
-          <button key={k} className={`pill${tier === k ? " warn" : ""}`} onClick={() => setTier(k)}>{t}</button>)}
-        <span className="muted" style={{ marginLeft: 8 }}>сортировка:</span>
-        {[["tier", "надёжность"], ["net", "ожидаемый итог"], ["risk", "риск"]].map(([k, t]) =>
-          <button key={k} className={`pill${sort === k ? " warn" : ""}`} onClick={() => setSort(k)}>{t}</button>)}
-      </div>
-      {cards.length === 0 ? <Card><p>Сейчас подходящих вариантов нет. Это нормальная ситуация: система не создаёт сигналы ради
-        заполнения экрана и продолжает исследование.</p></Card> :
-        cards.map((c) => <SignalCard key={c.id} c={c} capital={capital} share={d.tier_share[c.tier]} />)}
-      <details><summary>Почему у остальных нет высокого рейтинга (диагностика)</summary>
-        <h3>Проверки рынка</h3>
-        <ul>{(d.market_checks as Any[]).map((m) => <li key={m.name} className={m.passed ? "" : "warn"}>{m.passed ? "✓" : "✗"} {m.ru}: {typeof m.value === "number" ? num(m.value, 3) : String(m.value)}</li>)}</ul>
+      <details><summary>Все варианты ({cards.length}) и диагностика</summary>
+        {cards.map((x) => <SignalCard key={x.id} c={x} capital={null} share={1} />)}
         <h3>Пулы с проблемами</h3>
         <ul>{(d.pools_with_problems as Any[]).map((p) => <li key={p.pair + p.fee_tier}>{p.pair} {pctAbs(p.fee_tier, 2)}: {p.problems.join("; ")}</li>)}</ul>
         <h3>Стратегии</h3>

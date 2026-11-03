@@ -330,6 +330,18 @@ def realized_vol(hours: list, p: ScanPool) -> float | None:
     return math.sqrt(var * per_year)
 
 
+def price_stats(hours: list, p: ScanPool) -> dict:
+    """Volume-weighted average price, low and high of the hourly closes over `hours`
+    (base price in quote; EXACT sums of swap amounts)."""
+    v0 = sum(h.vol0 for h in hours)
+    v1 = sum(h.vol1 for h in hours)
+    closes = [base_price(int(h.close_sqrt_price), p) for h in hours]
+    if not v0 or not v1 or not closes:
+        return {"vwap_7d": None, "low_7d": None, "high_7d": None}
+    vwap = v1 / v0 if p.base == p.token0 else v0 / v1
+    return {"vwap_7d": vwap, "low_7d": min(closes), "high_7d": max(closes)}
+
+
 # ---------------------------------------------------------------- scan
 def scan(engine, client, cfg, pools: list[ScanPool], now: int | None = None) -> dict:
     now = now or int(time.time())
@@ -427,6 +439,8 @@ def scan(engine, client, cfg, pools: list[ScanPool], now: int | None = None) -> 
             "pool": p.key, "pair": f"{p.base}/{p.quote}", "address": p.address, "fee_tier": p.fee / 1e6,
             "token0": p.token0, "token1": p.token1,
             "price": base_price(st["sqrt_price"], p), "tick": st["tick"],
+            "usd0": u0, "usd1": u1, "base_usd": u0 if p.base == p.token0 else u1,
+            "quote_usd": u1 if p.base == p.token0 else u0, **price_stats(h7, p),
             "tvl_usd": tvl, "active_liquidity_usd_2pct": active_usd,
             "volume_usd": vol_usd, "fees_usd": fees_usd,
             "fee_yield_active_24h": fees_usd["24h"] / active_usd if active_usd else None,
