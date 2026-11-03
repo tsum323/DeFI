@@ -30,7 +30,7 @@ GitHub Actions (`.github/workflows/live.yml`): каждый запуск сам 
 
 ## Ограничения (честно)
 - Точная модель и многолетняя проверка есть только для WBTC/USDC 0,3%. Остальные пулы Ethereum — 30 дней,
-  пулы Base/Arbitrum/Optimism — 14 дней часовых данных (ESTIMATED), только категория EXPERIMENTAL.
+  пулы Base/Arbitrum/Optimism — 8 дней часовых данных (ESTIMATED), только категория EXPERIMENTAL.
 - Узлы L2-сетей недоступны из среды разработки (сетевые ограничения); проверка адресов и пулов —
   через GitHub Actions (`.github/workflows/tools.yml`, `scripts/discover_networks.py`).
 - Поправка комиссий сканера измерена на Ethereum; для L2 она применяется так же (не измерена отдельно).

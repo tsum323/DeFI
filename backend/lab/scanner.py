@@ -102,9 +102,10 @@ def scan_pools(cfg, keys: list[str]) -> list[ScanPool]:
 
 
 # ---------------------------------------------------------------- endpoints per network
-def scanner_clients(cfg, networks: set[str]) -> tuple[dict, dict]:
+def scanner_clients(cfg, networks: set[str], with_fallbacks: bool = False) -> tuple[dict, dict]:
     """One working read-only client per network (the configured endpoint first, then the
-    others in config order). Returns ({network: client}, {network: error})."""
+    others in config order). Returns ({network: client}, {network: error}); with
+    `with_fallbacks` the values are lists of every answering client, preferred first."""
     from backend.data_engine.rpc import EndpointUnavailable, RpcError, build_clients
     prefs = cfg.lab["scanner"].get("networks", {})
     out, errors = {}, {}
@@ -112,30 +113,49 @@ def scanner_clients(cfg, networks: set[str]) -> tuple[dict, dict]:
         clients, notes = build_clients(cfg.networks[net])
         pref = prefs.get(net, {}).get("endpoint")
         clients.sort(key=lambda c: c.name != pref)
+        ok = []
         for c in clients:
             try:
                 if c.chain_id() == cfg.networks[net].chain_id:
-                    out[net] = c
-                    break
+                    ok.append(c)
+                    if not with_fallbacks:
+                        break
             except (EndpointUnavailable, RpcError, OSError) as exc:
                 notes.append(f"{c.name}: {str(exc)[:100]}")
+        if ok:
+            out[net] = ok if with_fallbacks else ok[0]
         if net not in out:
             errors[net] = "; ".join(notes) or "no endpoint"
     return out, errors
 
 
 def ingest_all(engine, cfg, clients: dict, pools: list[ScanPool], max_seconds: float = 300) -> list[dict]:
-    """Incremental Swap logs for every network that has a client (time split evenly)."""
+    """Incremental Swap logs for every network that has a client (time split evenly).
+    A network's failure never stops the others; within a network the next endpoint is
+    tried when one refuses (e.g. a node without old history). Ethereum goes first."""
+    from backend.data_engine.rpc import EndpointUnavailable, RpcError
     prefs = cfg.lab["scanner"].get("networks", {})
-    nets = [n for n in sorted({p.network for p in pools}) if n in clients]
+    nets = sorted((n for n in {p.network for p in pools} if n in clients), key=lambda n: (n != "ethereum", n))
     out = []
     for net in nets:
         pr = prefs.get(net, {})
-        out.append(ingest(engine, clients[net], [p for p in pools if p.network == net],
-                          backfill_days=pr.get("backfill_days", cfg.lab["scanner"]["backfill_days"]),
-                          step=pr.get("step", 100), batch=pr.get("batch", 3),
-                          max_seconds=max_seconds / max(1, len(nets)),
-                          block_time=cfg.networks[net].block_time_seconds, network=net))
+        cands = clients[net] if isinstance(clients[net], list) else [clients[net]]
+        errors = []
+        for c in cands:
+            try:
+                r = ingest(engine, c, [p for p in pools if p.network == net],
+                           backfill_days=pr.get("backfill_days", cfg.lab["scanner"]["backfill_days"]),
+                           step=pr.get("step", 100), batch=pr.get("batch", 3),
+                           max_seconds=max_seconds / max(1, len(nets)),
+                           block_time=cfg.networks[net].block_time_seconds, network=net)
+                r["endpoint"] = c.name
+                out.append(r)
+                break
+            except (EndpointUnavailable, RpcError) as exc:
+                errors.append(f"{c.name}: {str(exc)[:120]}")
+        else:
+            out.append({"network": net, "error": "; ".join(errors), "complete": False, "logs": 0,
+                        "from_block": None, "to_block": None})
     return out
 
 
@@ -262,7 +282,7 @@ def ingest(engine, client, pools: list[ScanPool], *, backfill_days: int = 30, st
         except (EndpointUnavailable, RpcError):
             if step <= 10:
                 raise
-            step = max(10, step // 4)   # window too large for this endpoint: retry smaller
+            step = max(10, step // 2)   # window too large for this endpoint: retry smaller
             batch = 1
             continue
         logs = sorted((lg for r in res for lg in r), key=lambda g: (int(g["blockNumber"], 16), int(g["logIndex"], 16)))

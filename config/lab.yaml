@@ -75,9 +75,11 @@ scanner:
   endpoint: drpc             # Ethereum: archive, free; 100-block eth_getLogs windows, batches of 3
   networks:                  # per network: preferred endpoint, first log window, backfill depth
     ethereum: {endpoint: drpc, step: 100, batch: 3, backfill_days: 30}
-    base: {endpoint: publicnode, step: 2000, batch: 1, backfill_days: 14}
-    optimism: {endpoint: publicnode, step: 2000, batch: 1, backfill_days: 14}
-    arbitrum: {endpoint: drpc, step: 5000, batch: 1, backfill_days: 14}
+    # measured from GitHub Actions (scripts/probe_logs.py, 2026-11-03): free dRPC allows only
+    # 100-block log windows on L2s; these endpoints serve 8 days of history in large windows
+    base: {endpoint: publicnode, step: 4000, batch: 1, backfill_days: 8}       # <= 10 000 blocks, 20 000 results
+    optimism: {endpoint: official, step: 9000, batch: 1, backfill_days: 8}     # publicnode keeps < 1 day
+    arbitrum: {endpoint: official, step: 50000, batch: 1, backfill_days: 8}    # publicnode has no history
 
 # UNISWAP AI LAB: virtual portfolio (backend/lab/portfolio.py). Change the capital here
 # (on GitHub: open this file, pencil icon, edit, "Commit changes") — the next update uses it.

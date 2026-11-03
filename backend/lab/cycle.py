@@ -153,13 +153,19 @@ def run_tick(engine, cfg, *, client, ds=None, study=None, version: str | None = 
     sc = cfg.lab["scanner"]
     pools = scan_pools(cfg, sc["pools"])
     nets = {p.network for p in pools}
-    clients, errors = scanner_clients(cfg, nets - {"ethereum"})
+    fallbacks, errors = scanner_clients(cfg, nets - {"ethereum"}, with_fallbacks=True)
+    clients = {n: cs[0] for n, cs in fallbacks.items()}
     clients["ethereum"] = client
+    fallbacks["ethereum"] = [client]
     for net, err in errors.items():
         log_activity(engine, "data", "error", f"Сеть {NETWORK_RU.get(net, net)}: нет доступного узла — пулы этой сети "
                      f"сейчас не обновляются ({err[:200]})")
-    rs = step(engine, "data", ingest_all, engine, cfg, clients, pools, 300) or []
+    rs = step(engine, "data", ingest_all, engine, cfg, fallbacks, pools, 300) or []
     for r in rs:
+        if r.get("error"):
+            log_activity(engine, "data", "error", f"{NETWORK_RU.get(r['network'], r['network'])}: ни один узел не отдал "
+                         f"историю обменов — пулы этой сети не обновлены ({r['error'][:220]})", r)
+            continue
         n = len([p for p in pools if p.network == r["network"]])
         log_activity(engine, "data", "ok" if r["complete"] else "warn",
                      f"{NETWORK_RU.get(r['network'], r['network'])}: загружено {r['logs']} обменов по {n} пулам "
