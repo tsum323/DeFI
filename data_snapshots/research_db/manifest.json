@@ -1,89 +1,100 @@
 {
- "optuna": "optuna.sqlite",
  "tables": {
   "activity": {
-   "rows": 5,
-   "sha256": "12ee26d776271844272b9d7b71542a7226aa8115a58bf3974845c528938c487e"
+   "rows": 120,
+   "sha256": "0bd2ffd148a22aed3d06108fd23d05da01044159e244a78b6cfc9a1ef53d5229"
+  },
+  "bot_history": {
+   "rows": 2,
+   "sha256": "744c539deba1040a097c13474f578893e0570e02af4f880b1183dfe6e47f030e"
+  },
+  "bot_positions": {
+   "rows": 2,
+   "sha256": "232a527e60ed78a0a09ef8d95705b2a0ecf39c259240ed594e0b37b243e6266f"
   },
   "datasets": {
    "rows": 43,
    "sha256": "a7cc089d5e8b3cc2afefae0b89b9caede01b1954764851d2f8ee956694714c4e"
   },
   "experiments": {
-   "rows": 22695,
-   "sha256": "7bd2cc8ac96c104a488608934fb20daaa10e0b70929747c5320e47b0497a1e44"
+   "rows": 23073,
+   "sha256": "be8cdcbfadcaa7700a137fac66a7f0619bf56c8949fc8f1ad9d9d56643760077"
   },
   "forecasts": {
-   "rows": 0,
-   "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+   "rows": 3,
+   "sha256": "3921416eddacd4c48f099d817941cc5d1ac1ece3d6a976a3e7e2ea6f45b6714f"
   },
   "forward_tests": {
-   "rows": 15,
-   "sha256": "e227588cae4022e2854cf39de49c236799e9cc449c6532330089654b81649427"
+   "rows": 18,
+   "sha256": "48cab391cfae557fdc4fd73c975d0fc9d51c7696ebaa926811a2469fa7cd6928"
   },
   "hypotheses": {
-   "rows": 5,
-   "sha256": "0493ccc4e778f43f506d60811f95ce349edc84828f4f6f011615364859f8ba47"
+   "rows": 8,
+   "sha256": "dfae4931ce4caac7f9319a46fc237e798dcacb90bfbbbd59f085e4687d97610d"
   },
   "hypothesis_experiments": {
-   "rows": 10,
-   "sha256": "e7e1cf7b134d306230249e5d508b395eacdf1a8a5092098a9eda21a87a03032c"
+   "rows": 19,
+   "sha256": "13270b5bee6a579dbb82d2a7bc5939a470996570117b575b3532d4f18fcdc3cf"
   },
   "job_runs": {
    "rows": 9,
    "sha256": "e04134c1b590548dce6cad510bb8efaa2b04549d8833b0bbf085b2ee7f8af8b3"
   },
   "lab_state": {
-   "rows": 0,
-   "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+   "rows": 4,
+   "sha256": "67870940e10c55aaaf89a15a208dc377411396cb837f9b10536378f551fd3b7d"
   },
   "lessons": {
    "rows": 0,
    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
   },
   "market_evaluations": {
-   "rows": 51,
-   "sha256": "ff8b0caee0567b8979223ae57dcf397a767f4a8a9c21a952b1c7230f11e33599"
+   "rows": 186,
+   "sha256": "bce818f1c8abb739dd9e4031aa304d122ae73fbc46acf522aecd07da2eac4dd9"
   },
   "opportunity_events": {
-   "rows": 21,
-   "sha256": "821d6b597af7dd838a96d76302d47fc6b41d6894f6fdaa6a0d4cd5adcb6caeb0"
+   "rows": 337,
+   "sha256": "d79c3c0d6c129b6be70b38c421d47acbb883a73348ccc895b86d800f167b0650"
   },
   "opportunity_rankings": {
    "rows": 1,
-   "sha256": "e41981ec77092b58e85cbb28e159ce24f21cc7a94e2bfb9b159e8fe04b842fea"
+   "sha256": "f03d33cf78e0e5b2b935a99a5feea93e50d8ee3b4af464275a07f3450f56cf0e"
   },
   "pool_hours": {
-   "rows": 5385,
-   "sha256": "dd0ebac3e1e5dd5237e80e2bf29afab83f4bfe595adb08d00e34475891d34cc1"
+   "rows": 7453,
+   "sha256": "30d429cc29408b63b6cb6c910c63d0a3b3f888ac07325d80fed5ce30ae2fb4d2"
   },
   "portfolio_history": {
-   "rows": 0,
-   "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+   "rows": 2,
+   "sha256": "6a5b0e241beb710322c83896a054b1b67fe1964cf338529ac55870d7d19ec8d0"
   },
   "portfolio_positions": {
-   "rows": 0,
-   "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+   "rows": 7,
+   "sha256": "9adbf98c55e51560a14d3d17a10dad7f8702915ffd3f2cb71ad661baf9221c4d"
   },
   "scan_results": {
    "rows": 1,
-   "sha256": "fe0ffbcf1d3e80bf0d3864183f398ee99d66bc584c0456676f07869daa5efe9f"
+   "sha256": "d65fe3548c2b9b7cfd1d0abae47230b8f35a103a1adcd38b7a28e9ec10367159"
   },
   "scan_state": {
-   "rows": 1,
-   "sha256": "b7050e03ab132261a37e2ad4f3653a246a663fb42ee3393a1c83cbde9db1e287"
+   "rows": 4,
+   "sha256": "d0cb06559c48b5a9d7444b0d60609244da8d4104c35f70befcd7a1a14f21fd13"
   },
   "signal_events": {
-   "rows": 3,
-   "sha256": "ebb576cf0e3c2c15d4d854556a6844dc2989f022df5b16d9e80193a1761b13e4"
+   "rows": 5,
+   "sha256": "774ecaa46973b6e59ce67c46ac6c4a9113400921042c49c623bc4bee17029b4b"
   },
   "signals": {
-   "rows": 3,
-   "sha256": "8bdec2d0091f12ee4b77ef409bb3f6a5c022badbc20e5ca98fa8c29a41e4cbcb"
+   "rows": 5,
+   "sha256": "2d76c7a2daaefb9d995ce663284628b8c4e50450eafaad8e3c4f64e6786bdc9c"
   },
   "strategies": {
-   "rows": 1009,
-   "sha256": "297c9f122aa063f160f105ea394cbbbe7d12b6c2993964a2319445dc80368e90"
+   "rows": 1018,
+   "sha256": "23ce1eaf6a0d83c51834929706364927a6766e34049eae25fcd0c91ec7d66611"
+  },
+  "tracked_positions": {
+   "rows": 1,
+   "sha256": "8396a9ffe4a17967ccf4e44c00ed2ab05c9aa4bbb78a3c3afa7d49e079be9eef"
   },
   "validation_reports": {
    "rows": 936,
