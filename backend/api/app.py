@@ -75,6 +75,11 @@ def lab_bot():
     return L.bot(engine, cfg)
 
 
+@app.get("/api/lab/positions")
+def lab_positions():
+    return L.positions(engine)
+
+
 @app.get("/api/lab/activity")
 def lab_activity():
     return L.activity(engine)

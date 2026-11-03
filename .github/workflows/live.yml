@@ -65,6 +65,8 @@ jobs:
           mkdir -p state_cache && cp -r data_snapshots/research_db state_cache/
           git checkout -- data_snapshots/research_db
       - name: Update data, signal, portfolio
+        env:
+          GH_TOKEN: ${{ github.token }}   # read the owner's "track" issues, comment advice changes
         run: python -m scripts.live_update --out _site --notify-file notify.json
       - name: Save research state
         run: |

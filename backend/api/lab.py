@@ -320,6 +320,11 @@ def bot(engine, cfg) -> dict:
     return summary(engine, cfg)
 
 
+def positions(engine) -> dict:
+    from backend.lab.tracking import summary
+    return summary(engine)
+
+
 def activity(engine) -> dict:
     return {"items": recent_activity(engine, 300)}
 

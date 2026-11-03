@@ -218,6 +218,12 @@ def run_tick(engine, cfg, *, client, ds=None, study=None, version: str | None = 
         for h in hrs:
             by_pool.setdefault(h.pool, []).append(h)
         bt = step(engine, "bot", bot.tick, engine, cfg, res, {p.key: p for p in pools}, by_pool, now)
+        from backend.lab import (
+            tracking,  # positions the user chose ("Выбрать" -> GitHub issue)
+        )
+        tr = step(engine, "tracking", tracking.sync, engine, cfg, res, {p.key: p for p in pools}, by_pool, None, now)
+        if tr:
+            out["tracking"] = tr
         bs = step(engine, "bot", bot.summary, engine, cfg, now)
         if bs is not None:
             bot.snapshot_day(engine, bs, now)

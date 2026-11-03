@@ -24,7 +24,7 @@ TABLES = ("strategies", "datasets", "experiments", "validation_reports", "hypoth
           "virtual_positions", "forward_tests", "job_runs", "opportunity_rankings",
           "opportunity_events", "pool_hours", "scan_state", "scan_results", "activity", "forecasts", "lessons",
           "portfolio_positions", "portfolio_history", "lab_state",
-          "bot_positions", "bot_history")
+          "bot_positions", "bot_history", "tracked_positions")
 SKIP_COLUMNS = {"experiments": {"actions_json"}}  # large and not needed for research
 
 

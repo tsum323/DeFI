@@ -90,6 +90,17 @@ function plan(c: CardT, amountUsd: number, entry: number) {
 }
 
 const fp = (x: number) => num(x, x >= 1000 ? 0 : x >= 10 ? 2 : 4);
+const REPO = "tsum323/DeFI";
+
+// A pre-filled GitHub issue: the live routine picks it up (backend/lab/tracking.py).
+function trackUrl(c: CardT, amount: number, r: { Pa: number; Pb: number; net: [number, number] }) {
+  const d = { pool: c.pool, price_lower: Number(r.Pa.toPrecision(8)), price_upper: Number(r.Pb.toPrecision(8)),
+    amount_usd: amount, card_id: c.id, strategy: c.strategy, tier: c.tier,
+    net_usd: [Number(r.net[0].toFixed(2)), Number(r.net[1].toFixed(2))], horizon_days: c.horizon_days };
+  const title = `Отслеживать: ${c.pair} ${(c.fee_tier * 100).toFixed(2)}% (${c.network_ru ?? "Ethereum"}) на $${amount}`;
+  const body = `Я выбрал этот сигнал. Не меняйте блок ниже — по нему система ведёт позицию.\n\n\`\`\`track\n${JSON.stringify(d)}\n\`\`\`\n\nЗакройте заявку, когда выйдете из позиции.`;
+  return `https://github.com/${REPO}/issues/new?title=${encodeURIComponent(title)}&body=${encodeURIComponent(body)}&labels=track`;
+}
 
 export function Signals() {
   const { data: d, error } = useApi<Any>("/api/lab/signals");
@@ -198,6 +209,16 @@ export function Signals() {
               <li>Суммы: <b>{num(r.x, 6)} {c.base}</b> и <b>{num(r.y, c.quote === "USDC" ? 2 : 6)} {c.quote}</b> (Uniswap подставит вторую сумму сам).</li>
               <li>Проверьте газ в кошельке и подтвердите. Никому не сообщайте секретную фразу.</li>
             </ol>
+          </Card>
+
+          <Card title="5. Выбрать этот сигнал и отслеживать">
+            <p>Нажмите кнопку — откроется GitHub с готовой заявкой. Нажмите там <b>«Create»</b>. В течение 15 минут система начнёт
+              вести эту позицию в разделе <b>«Мои позиции»</b>: стоимость, комиссии, итог и совет — держать, переставить диапазон,
+              выйти или переехать. При смене совета придёт уведомление в приложение GitHub. Закончили — закройте заявку.</p>
+            <a className="pill warn" style={{ display: "inline-block", padding: "8px 14px", fontSize: 14 }} target="_blank" rel="noopener"
+              href={trackUrl(c, amount, r)}>Выбрать этот сигнал</a>
+            <p className="muted">Отслеживается диапазон {fp(r.Pa)} – {fp(r.Pb)} на {usd(amount)} — как вы его откроете в Uniswap
+              (диапазон сам не переставляется; когда нужно — система подскажет).</p>
           </Card>
         </>}
       </>}
@@ -390,5 +411,51 @@ export function Bot() {
         </ul>
         <p className="muted">Расчёт по часовым данным пулов (ОЦЕНКА). Перевод денег между сетями (мост) в расчёте не учтён.</p>
       </Card>
+    </>);
+}
+
+
+// ---------------------------------------------------------------- My positions (chosen signals)
+const ADVICE_TONE: Record<string, string> = { hold: "pos", out: "warn", out_long: "neg", move: "warn", review: "" };
+const short = (ts: number) => date(ts).replace(/\s\d{4}\sг\.,/, ",").replace(" МСК", "");
+
+export function Positions() {
+  const { data: d, error } = useApi<Any>("/api/lab/positions");
+  if (!d) return <Loading error={error} />;
+  const NET: Record<string, string> = { ethereum: "Ethereum", base: "Base", arbitrum: "Arbitrum", optimism: "Optimism" };
+  const card = (p: Any) => {
+    const m = p.mark ?? {}, a = p.advice;
+    const cells: [string, string][] = [
+      ["Выбран", short(p.created_at)],
+      ["Цена входа", num(p.entry.price, p.entry.price >= 1000 ? 0 : 2)],
+      ["Диапазон", `${num(p.range[0], p.range[0] >= 1000 ? 0 : 2)} – ${num(p.range[1], p.range[1] >= 1000 ? 0 : 2)}`],
+      ["Цена сейчас", m.price != null ? num(m.price, m.price >= 1000 ? 0 : 2) : "—"],
+      ["Стоимость", m.value_usd != null ? usd(m.value_usd, 2) : "—"], ["Итог", m.net_usd != null ? usd(m.net_usd, 2) : "—"],
+      ["Комиссии", m.fees_usd != null ? usd(m.fees_usd, 2) : "—"], ["Потеря к хранению", m.il_usd != null ? usd(m.il_usd, 2) : "—"],
+      ["Расходы (оценка)", usd(p.entry.costs_usd, 2)], ["К хранению", m.vs_hodl_usd != null ? usd(m.vs_hodl_usd, 2) : "—"],
+      ["Время в диапазоне", m.time_in_range != null ? pctAbs(m.time_in_range, 0) : "—"],
+      ["Прогноз за неделю", p.entry.card?.net_usd ? `${usd(p.entry.card.net_usd[0], 2)} … ${usd(p.entry.card.net_usd[1], 2)}` : "—"]];
+    return (
+      <div className="vpos" key={p.id}>
+        <div className="vpos-head"><b>{p.pair}</b> · {NET[p.network] ?? p.network} · {usd(p.amount_usd)}
+          <span className="vpos-tags">{a && <Pill tone={ADVICE_TONE[a.code]}>{a.title}</Pill>}</span></div>
+        {a && <p>{a.text}</p>}
+        <div className="vpos-grid">{cells.map(([l, v]) => <div key={l}><span>{l}</span><b>{v}</b></div>)}</div>
+        {p.history.length > 0 && <details><summary>История советов ({p.history.length})</summary>
+          <ul>{p.history.map((h: Any, i: number) => <li key={i}>{date(h.at)} · {h.title} (итог тогда {usd(h.net_usd, 2)})</li>)}</ul></details>}
+        <p className="muted"><a href={`https://github.com/${d.repo}/issues/${p.issue}`} target="_blank" rel="noopener">заявка #{p.issue} на GitHub</a>
+          {p.status === "open" ? " — закройте её, когда выйдете из позиции" : ` — закрыта ${date(p.closed_at)}`}</p>
+      </div>);
+  };
+  return (
+    <>
+      <h1>Мои позиции <Badge label="ESTIMATED" /></h1>
+      <p className="lead">Сигналы, которые вы выбрали кнопкой «Выбрать этот сигнал». Система ведёт их с момента выбора и
+        подсказывает, когда держать, когда выходить или переставлять диапазон. Расчёт — по часовым данным пула (оценка).</p>
+      <Card title={`Открытые: ${d.open.length}`}>
+        {d.open.length === 0 ? <p className="muted">Пока нет. Выберите вариант в «Сигналах» и нажмите «Выбрать этот сигнал»
+          (заявка появится здесь в течение 15 минут).</p> : d.open.map(card)}
+      </Card>
+      {d.closed.length > 0 && <Card title={`Закрытые: ${d.closed.length}`}>{d.closed.map(card)}</Card>}
     </>);
 }

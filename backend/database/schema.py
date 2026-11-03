@@ -401,6 +401,26 @@ bot_history = Table(
     Column("payload_json", Text, nullable=False),
 )
 
+# ------------------------------------------------------------ UNISWAP AI LAB: positions the user follows
+tracked_positions = Table(  # a signal the user chose ("Выбрать" -> GitHub issue), followed live
+    "tracked_positions", metadata,
+    Column("id", Integer, primary_key=True, autoincrement=True),
+    Column("issue_number", Integer, nullable=False, unique=True),
+    Column("created_at", BigInteger, nullable=False),
+    Column("pool", String(64), nullable=False),
+    Column("network", String(16), nullable=False),
+    Column("pair", String(32), nullable=False),
+    Column("amount_usd", Float, nullable=False),
+    Column("price_lower", Float, nullable=False),
+    Column("price_upper", Float, nullable=False),
+    Column("entry_json", Text, nullable=False),        # price, usd prices, amounts, forecast, card
+    Column("status", String(8), nullable=False),       # open | closed
+    Column("mark_json", Text),
+    Column("advice_json", Text),                       # current advice
+    Column("history_json", Text),                      # advice changes over time
+    Column("closed_at", BigInteger),
+)
+
 lab_state = Table(  # small named parameters the system learns (with history in `activity`)
     "lab_state", metadata,
     Column("key", String(64), primary_key=True),

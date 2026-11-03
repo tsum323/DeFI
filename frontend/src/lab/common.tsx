@@ -21,7 +21,7 @@ export const RULE_RU: Record<string, string> = {
 const fmtPrice = (x: number) => num(x, x >= 1000 ? 0 : x >= 10 ? 2 : 4);
 
 export interface CardT {
-  id: string; source: "exact" | "estimated"; tier: string; pair: string; network: string; pool_address: string;
+  id: string; source: "exact" | "estimated"; tier: string; pair: string; network: string; pool_address: string; pool: string;
   fee_tier: number; price: number; token0: string; token1: string; network_ru?: string; gas_note?: string; price_lower: number; price_upper: number; deposit_usd: number;
   token0_amount: number; token1_amount: number; quote_share: number | null; base: string; quote: string;
   strategy: string; strategy_ru?: string; rule: string; horizon_days: number; fees_usd: [number, number]; il_usd: number;
