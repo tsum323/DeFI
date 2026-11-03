@@ -7,7 +7,7 @@ on:
       script:
         description: "script to run"
         type: choice
-        options: [discover_networks]
+        options: [discover_networks, probe_logs]
         default: discover_networks
 permissions:
   contents: read
