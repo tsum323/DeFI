@@ -7,6 +7,7 @@ backtest), ESTIMATED (hourly approximation), SCENARIO (forecast). Nothing here w
 from __future__ import annotations
 
 import json
+import math
 import time
 
 from sqlalchemy import func, select
@@ -54,6 +55,7 @@ def _exact_card(o: dict) -> dict:
         "price": o["current_price"], "price_lower": rng["price_lower"], "price_upper": rng["price_upper"],
         "deposit_usd": a["deposit_usd"], "token0_amount": a["token0"], "token1_amount": a["token1"],
         "quote_share": a.get("usdc_value_share"), "base": "WBTC", "quote": "USDC", "token0": "WBTC", "token1": "USDC",
+        "liquidity_raw": a.get("liquidity"),
         "strategy": o["strategy"], "strategy_ru": describe(params_from_json(json.dumps(o["params"])))
         if o.get("params") else o["strategy"], "rule": o["rebalance_rule"], "horizon_days": o["horizon_days"],
         "fees_usd": o["expected_fees_usd"], "il_usd": o["expected_il_usd"],
@@ -96,6 +98,7 @@ def _scan_card(p: dict, scan: dict) -> dict | None:
         "pool": p["pool"], "pool_address": p["address"], "fee_tier": p["fee_tier"], "price": p["price"],
         "price_lower": b["price_lower"], "price_upper": b["price_upper"], "deposit_usd": scan["capital_usd"],
         "token0_amount": b["amount0"], "token1_amount": b["amount1"], "quote_share": b["share_quote_value"],
+        "liquidity_share": b.get("liquidity_share"),
         "base": base, "quote": quote, "token0": p.get("token0", base), "token1": p.get("token1", quote),
         "strategy": f"static ±{b['width']:.0%}", "strategy_ru": f"диапазон ±{b['width']:.0%} от цены; диапазон не меняется",
         "rule": "none",
@@ -128,6 +131,13 @@ def signals(engine) -> dict:
         if c and p.get("score") is not None and c["net_usd"][1] > 0:
             cards.append(c)
     add_entry_prices(cards, scan)
+    act = int((ranking.get("market") or {}).get("active_liquidity") or 0)
+    for c in cards:   # our share of the liquidity earning at the current price, for the card's size
+        if c["source"] == "exact" and act and c.get("liquidity_raw"):
+            mine = int(c["liquidity_raw"])
+            c["liquidity_share"] = mine / (act + mine)
+    for c in cards:
+        c["amount_guide"] = amount_guide(c)
     bad = [{"pair": p["pair"], "fee_tier": p["fee_tier"], "problems": p["problems"] + p["data_quality"]}
            for p in scan.get("pools", []) if p["problems"] or p["data_quality"]]
     return {"strict": _strict(engine), "cards": cards, "best_today": best_today(cards), "tier_share": TIER_SHARE,
@@ -160,6 +170,50 @@ def best_today(cards: list[dict], n: int = 4) -> list[str]:
     if second:
         out.append(second)
     return [c["id"] for c in sorted(out, key=lambda c: (TIER_ORDER[c["tier"]], -_mid(c)))[:n]]
+
+
+GAS_SHARE_MAX = 0.10      # gas should take at most 10% of the expected fees
+POOL_SHARE_MAX = 0.02     # our liquidity at most 2% of the liquidity earning now
+
+
+def _ru(x: float) -> str:
+    return f"{x:,.0f}".replace(",", " ")
+
+
+def _nice_up(x: float) -> float:
+    step = 100 if x < 2_000 else 500 if x < 10_000 else 1_000 if x < 50_000 else 5_000
+    return math.ceil(x / step) * step
+
+
+def _nice_down(x: float) -> float:
+    step = 100 if x < 2_000 else 500 if x < 10_000 else 1_000 if x < 50_000 else 5_000
+    return max(step, math.floor(x / step) * step)
+
+
+def amount_guide(c: dict) -> dict:
+    """Recommended amount for a card, from two limits (no invented numbers):
+    min  — gas (fixed per position) takes at most GAS_SHARE_MAX of the expected fees;
+    max  — our liquidity stays below POOL_SHARE_MAX of the liquidity earning now (beyond
+           that our own deposit dilutes the fees and moves the price; the model is less reliable).
+    Fees, loss vs holding and the swap scale with the amount; gas does not."""
+    dep = c["deposit_usd"]
+    fees_mid = (c["fees_usd"][0] + c["fees_usd"][1]) / 2 / dep            # per dollar, horizon
+    edge = fees_mid + (c["il_usd"] - c["swap_usd"]) / dep                 # per dollar before gas
+    share = c.get("liquidity_share")
+    max_amt = dep * POOL_SHARE_MAX / share if share else None
+    if fees_mid <= 0 or edge <= 0:
+        return {"recommended": None, "min": None, "max": max_amt,
+                "why": "по расчёту модели этот вариант не окупается ни при какой сумме — лучше подождать других вариантов"}
+    min_amt = c["gas_usd"] / (GAS_SHARE_MAX * fees_mid)
+    rec = _nice_up(min_amt)
+    if max_amt is not None and rec > max_amt:
+        return {"recommended": None, "min": min_amt, "max": max_amt,
+                "why": f"чтобы газ был не больше 10% комиссий, нужно от ~${_ru(min_amt)}, но больше ~${_ru(max_amt)} "
+                       "в этот пул ставить не стоит — вариант слишком мелкий для такого газа; лучше подождать"}
+    return {"recommended": rec, "min": min_amt, "max": _nice_down(max_amt) if max_amt else None,
+            "why": (f"от ~${_ru(min_amt)} газ (${c['gas_usd']:.2f}) занимает не больше 10% ожидаемых комиссий; "
+                    + (f"больше ~${_ru(max_amt)} ставить не стоит: ваша доля превысит 2% работающей ликвидности пула"
+                       if max_amt else "верхний предел по ликвидности пула не рассчитан"))}
 
 
 def add_entry_prices(cards: list[dict], scan: dict) -> None:

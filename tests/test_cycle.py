@@ -67,3 +67,14 @@ def test_best_of_day_and_entry_price_guide():
     high = [card("a", "WBTC/USDC", "MODERATE", [1, 9], price=121.0)]
     add_entry_prices(high, scan)
     assert high[0]["entry"]["recommended"] == 110.0 and "подождать" in high[0]["entry"]["verdict"]
+
+
+def test_recommended_amount_limits():
+    from backend.api.lab import amount_guide
+    c = {"deposit_usd": 10_000.0, "fees_usd": [10.0, 30.0], "il_usd": -5.0, "swap_usd": 1.0, "gas_usd": 2.0,
+         "liquidity_share": 0.001}
+    g = amount_guide(c)
+    assert round(g["min"]) == 10_000 * 2.0 / (0.1 * 20.0) and g["recommended"] == 10_000  # gas = 10% of fees
+    assert round(g["max"]) == 200_000                                                         # 2% of active liquidity
+    assert amount_guide({**c, "fees_usd": [0.0, 0.0]})["recommended"] is None                 # never pays off
+    assert amount_guide({**c, "liquidity_share": 0.5})["recommended"] is None                 # too small a pool

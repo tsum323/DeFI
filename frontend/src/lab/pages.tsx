@@ -91,16 +91,16 @@ export function Signals() {
   const { data: d, error } = useApi<Any>("/api/lab/signals");
   const [picked, setPicked] = useStored("picked_card", "");
   const [amountS, setAmountS] = useStored("invest_amount", "1000");
-  const [mode, setMode] = useState<"now" | "rec" | "own">("now");
-  const [own, setOwn] = useState("");
+  const [choice, setChoice] = useStored("amount_choice", "rec");
   if (!d) return <Loading error={error} />;
   const cards = d.cards as CardT[];
   const best = (d.best_today as string[]).map((id) => cards.find((c) => c.id === id)).filter(Boolean) as CardT[];
   const c = cards.find((x) => x.id === picked) ?? best[0];
-  const amount = Math.max(0, Number(amountS.replace(/\s/g, "")) || 0);
-  const e = c?.entry;
-  const entry = !c ? 0 : mode === "rec" && e ? e.recommended : mode === "own" && Number(own) > 0 ? Number(own) : c.price;
-  const r = c && amount > 0 ? plan(c, amount, entry) : null;
+  const g = c?.amount_guide;
+  const amount = choice === "rec" && g?.recommended != null ? g.recommended
+    : choice === "own" ? Math.max(0, Number(amountS.replace(/\s/g, "")) || 0) : 0;
+  const entry = c?.price ?? 0;
+  const r = c && amount > 0 && choice !== "wait" ? plan(c, amount, entry) : null;
   const t0 = c?.token0 === c?.base;
   return (
     <>
@@ -121,29 +121,29 @@ export function Signals() {
           </button>))}
 
       {c && <>
-        <h2 className="section">2. Сколько вы готовы вложить</h2>
-        <Card><div className="capital"><input inputMode="decimal" value={amountS} onChange={(ev) => setAmountS(ev.target.value)} /> <span>USD</span></div>
-          <p className="muted">Всё ниже посчитано на эту сумму. Не вкладывайте деньги, потерю которых не можете себе позволить.</p></Card>
-
-        <h2 className="section">3. Цена входа (1 {c.base} в {c.quote})</h2>
+        <h2 className="section">2. Сколько вложить</h2>
         <Card>
+          {g?.recommended != null ? <p className="hero">Рекомендуемая сумма: <b>{usd(g.recommended)}</b></p>
+            : <p className="hero warn">Рекомендуемой суммы нет</p>}
+          <p className="muted">{g?.why}. Больше рекомендуемой можно — доход и возможный убыток растут вместе с суммой; решаете вы.
+            Не вкладывайте деньги, потерю которых не можете себе позволить.</p>
           <div className="tabs">
-            <button className={`pill${mode === "now" ? " warn" : ""}`} onClick={() => setMode("now")}>текущая {fp(c.price)}</button>
-            {e && e.recommended < c.price && <button className={`pill${mode === "rec" ? " warn" : ""}`} onClick={() => setMode("rec")}>рекомендуемая {fp(e.recommended)}</button>}
-            {e && e.recommended >= c.price && <span className="pill pos">текущая цена ниже средней за неделю — она и есть рекомендуемая</span>}
-            <button className={`pill${mode === "own" ? " warn" : ""}`} onClick={() => setMode("own")}>своя</button>
-            {mode === "own" && <span className="capital"><input inputMode="decimal" placeholder={fp(c.price)} value={own} onChange={(ev) => setOwn(ev.target.value)} /></span>}
+            {g?.recommended != null && <button className={`pill${choice === "rec" ? " warn" : ""}`} onClick={() => setChoice("rec")}>взять рекомендуемую {usd(g.recommended)}</button>}
+            <button className={`pill${choice === "own" ? " warn" : ""}`} onClick={() => setChoice("own")}>своя сумма</button>
+            <button className={`pill${choice === "wait" ? " warn" : ""}`} onClick={() => setChoice("wait")}>подождать других вариантов</button>
           </div>
-          {e ? <>
-            <p>{e.verdict}.</p>
-            <p className="muted">Средняя цена за неделю (по объёму сделок) {fp(e.average_7d)} · минимум {fp(e.low_7d)} · максимум {fp(e.high_7d)} ({e.reference_pool}). {e.assumption}.</p>
-            {Math.abs(e.pool_vs_market) > 0.003 && <p className="warn">Цена в этом пуле отличается от основного рынка на {pct(e.pool_vs_market, 2)} — проверьте цену перед входом.</p>}
-          </> : <p className="muted">Нет данных о средней цене.</p>}
-          {mode !== "now" && <p className="muted">Если выбираете не текущую цену — открывайте позицию, когда цена в Uniswap дойдёт до {fp(entry)}. Диапазон ниже уже сдвинут к этой цене.</p>}
+          {choice === "own" && <div className="capital"><input inputMode="decimal" value={amountS} onChange={(ev) => setAmountS(ev.target.value)} /> <span>USD</span>
+            {g?.min != null && amount > 0 && amount < g.min && <span className="warn">меньше ~{usd(g.min)} — газ съест заметную часть дохода</span>}
+            {g?.max != null && amount > g.max && <span className="warn">больше ~{usd(g.max)} — слишком большая доля в пуле, расчёт ненадёжен</span>}</div>}
+          {choice === "wait" && <div>
+            <p>Хорошо, ничего не открываем. Система пересчитывает варианты каждые 15 минут и раз в день ищет новые стратегии;
+              если появится более проверенный вариант, придёт уведомление.</p>
+            {c.to_improve.length > 0 && <p className="muted">Чтобы этот вариант стал надёжнее: {c.to_improve.join("; ")}.</p>}
+          </div>}
         </Card>
 
         {r && <>
-          <h2 className="section">4. Расчёт на {usd(amount)}</h2>
+          <h2 className="section">3. Расчёт на {usd(amount)}</h2>
           <Card right={<Badge label={c.label} />}>
             <p className="hero">Диапазон: <b>{fp(r.Pa)} – {fp(r.Pb)} {c.quote}</b> за 1 {c.base}<br />
               Внести: <b>{num(r.x, c.base === "USDC" ? 2 : 6)} {c.base}</b> + <b>{num(r.y, c.quote === "USDC" ? 2 : 6)} {c.quote}</b> ({pctAbs(1 - r.baseShare, 0)} в {c.quote})<br />
@@ -172,7 +172,7 @@ export function Signals() {
             {c.token_risks && <p className="muted">{c.token_risks.join(" ")}</p>}
           </Card>
 
-          <Card title="5. Как открыть на Uniswap (делаете вы сами)">
+          <Card title="4. Как открыть на Uniswap (делаете вы сами)">
             <ol>
               <li>Откройте <b>app.uniswap.org</b> (набирайте адрес вручную) и подключите свой кошелёк.</li>
               <li>Раздел «Pool» → «New position» → сеть <b>Ethereum</b>.</li>
