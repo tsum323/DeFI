@@ -9,7 +9,7 @@
 | `backend/data_engine` | инкрементальная загрузка всех событий WBTC/USDC 0,3% (с мая 2021), проверки | EXACT |
 | `backend/backtesting` | целочисленная математика v3 как в Solidity, точный реплей пула, комиссии через fee growth, симуляция позиций | MODELED |
 | `backend/validation`, `backend/optimizer` | 21 период × 91 день, проверка на «невиденных» данных, walk-forward, Optuna только на периодах подбора; `freshness` — пересчёт только при смене кода или новом периоде | MODELED |
-| `backend/lab/scanner.py` | Market Scanner: 8 пулов (WBTC/USDC, WETH/USDC, WBTC/WETH, все активные комиссии); часовые итоги обменов, состояние пулов, оценки диапазонов ±2…30% | EXACT / ESTIMATED |
+| `backend/lab/scanner.py` | Market Scanner: 19 пулов в 4 сетях — Ethereum (8), Base (5), Arbitrum (4), Optimism (2); часовые итоги обменов, состояние пулов, газ сети (в L2 — с платой за запись в Ethereum), оценки диапазонов ±2…30% | EXACT / ESTIMATED |
 | `backend/signal_engine` | строгий сигнал (все проверки) + рейтинг возможностей CONSERVATIVE / MODERATE / EXPERIMENTAL | SCENARIO |
 | `backend/lab/portfolio.py` | виртуальный портфель: капитал из `config/lab.yaml`, доли по уровню, правила закрытия, история по дням | MODELED / ESTIMATED |
 | `backend/lab/learning.py` | прогноз при открытии → сравнение с фактом → причины → выводы → новые гипотезы | — |
@@ -29,8 +29,11 @@ GitHub Actions (`.github/workflows/live.yml`): каждый запуск сам 
 сигнала автоматически не меняются: только через код, тесты и историю Git (откат — `git revert`).
 
 ## Ограничения (честно)
-- Точная модель и многолетняя проверка есть только для WBTC/USDC 0,3%. Остальные пулы — 30 дней
-  часовых данных (ESTIMATED), только категория EXPERIMENTAL.
+- Точная модель и многолетняя проверка есть только для WBTC/USDC 0,3%. Остальные пулы Ethereum — 30 дней,
+  пулы Base/Arbitrum/Optimism — 14 дней часовых данных (ESTIMATED), только категория EXPERIMENTAL.
+- Узлы L2-сетей недоступны из среды разработки (сетевые ограничения); проверка адресов и пулов —
+  через GitHub Actions (`.github/workflows/tools.yml`, `scripts/discover_networks.py`).
+- Поправка комиссий сканера измерена на Ethereum; для L2 она применяется так же (не измерена отдельно).
 - Часовая оценка комиссий сверяется с точной моделью ежедневно (завышение ~19–31% → поправка 0,84).
 - Uniswap Subgraph не используется: нужен ключ The Graph.
 - Вероятность выхода из диапазона — приближение (броуновское движение без сноса).

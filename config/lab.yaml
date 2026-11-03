@@ -67,9 +67,17 @@ scheduler:
 # UNISWAP AI LAB: market scanner (backend/lab/scanner.py)
 scanner:
   pools: [wbtc_usdc_3000, wbtc_usdc_500, weth_usdc_100, weth_usdc_500, weth_usdc_3000,
-          wbtc_weth_100, wbtc_weth_500, wbtc_weth_3000]
-  backfill_days: 30          # first run only; afterwards only new blocks
-  endpoint: drpc             # archive, free; 100-block eth_getLogs windows, batches of 3
+          wbtc_weth_100, wbtc_weth_500, wbtc_weth_3000,
+          base_weth_usdc_500, base_weth_usdc_3000, base_cbbtc_usdc_500, base_cbbtc_usdc_3000, base_cbbtc_weth_500,
+          arb_weth_usdc_500, arb_weth_usdc_3000, arb_wbtc_usdc_500, arb_wbtc_weth_500,
+          op_weth_usdc_500, op_weth_usdc_3000]
+  backfill_days: 30          # first run only (Ethereum); afterwards only new blocks
+  endpoint: drpc             # Ethereum: archive, free; 100-block eth_getLogs windows, batches of 3
+  networks:                  # per network: preferred endpoint, first log window, backfill depth
+    ethereum: {endpoint: drpc, step: 100, batch: 3, backfill_days: 30}
+    base: {endpoint: publicnode, step: 2000, batch: 1, backfill_days: 14}
+    optimism: {endpoint: publicnode, step: 2000, batch: 1, backfill_days: 14}
+    arbitrum: {endpoint: drpc, step: 5000, batch: 1, backfill_days: 14}
 
 # UNISWAP AI LAB: virtual portfolio (backend/lab/portfolio.py). Change the capital here
 # (on GitHub: open this file, pencil icon, edit, "Commit changes") — the next update uses it.

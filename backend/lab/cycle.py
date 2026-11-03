@@ -139,28 +139,42 @@ def run_tick(engine, cfg, *, client, ds=None, study=None, version: str | None = 
     from backend.lab import portfolio as pf
     from backend.lab.learning import review_forecasts
     from backend.lab.scanner import (
+        NETWORK_RU,
         calibrate_fees,
-        ingest,
+        ingest_all,
         save_scan,
         scan,
         scan_pools,
+        scanner_clients,
         set_state,
     )
     now = now or int(time.time())
     out: dict = {}
     sc = cfg.lab["scanner"]
     pools = scan_pools(cfg, sc["pools"])
-    r = step(engine, "data", ingest, engine, client, pools, backfill_days=sc["backfill_days"], max_seconds=300)
-    if r is not None:
+    nets = {p.network for p in pools}
+    clients, errors = scanner_clients(cfg, nets - {"ethereum"})
+    clients["ethereum"] = client
+    for net, err in errors.items():
+        log_activity(engine, "data", "error", f"Сеть {NETWORK_RU.get(net, net)}: нет доступного узла — пулы этой сети "
+                     f"сейчас не обновляются ({err[:200]})")
+    rs = step(engine, "data", ingest_all, engine, cfg, clients, pools, 300) or []
+    for r in rs:
+        n = len([p for p in pools if p.network == r["network"]])
         log_activity(engine, "data", "ok" if r["complete"] else "warn",
-                     f"Загружено {r['logs']} обменов по {len(pools)} пулам (блоки {r['from_block']}–{r['to_block']})"
+                     f"{NETWORK_RU.get(r['network'], r['network'])}: загружено {r['logs']} обменов по {n} пулам "
+                     f"(блоки {r['from_block']}–{r['to_block']})"
                      + ("" if r["complete"] else "; не всё — продолжу в следующий раз"), r)
-    res = step(engine, "scan", scan, engine, client, cfg, pools, now)
+    loading = {r["network"] for r in rs if not r["complete"]}
+    res = step(engine, "scan", scan, engine, clients, cfg, pools, now, loading)
     if res is not None:
         save_scan(engine, res)
+        for net, err in res.get("network_errors", {}).items():
+            log_activity(engine, "scan", "warn", f"Сеть {NETWORK_RU.get(net, net)} не просканирована: {err[:200]}")
         good = [p for p in res["pools"] if p["score"] is not None and p["best"]["net_mid_usd"] > 0]
-        log_activity(engine, "scan", "ok", f"Просканировано пулов: {len(res['pools'])}; с положительной оценкой: {len(good)}"
-                     + (f"; лучший {good[0]['pair']} {good[0]['fee_tier']:.2%}" if good else ""))
+        log_activity(engine, "scan", "ok", f"Просканировано пулов: {len(res['pools'])} в {len({p['network'] for p in res['pools']})} сетях; "
+                     f"с положительной оценкой: {len(good)}"
+                     + (f"; лучший {good[0]['pair']} {good[0]['fee_tier']:.2%} ({good[0]['network_ru']})" if good else ""))
     out["scan"] = res is not None
     ranking = latest_ranking(engine)
     strategies = {}

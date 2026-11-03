@@ -20,8 +20,8 @@ from backend.lab.scanner import (
     range_fees,
 )
 
-WBTC_USDC = ScanPool("wbtc_usdc_3000", "0x99ac8cA7087fA4A2A1FB6357269965A2014ABc35", "WBTC", "USDC", 8, 6, 3000, "WBTC")
-USDC_WETH = ScanPool("weth_usdc_500", "0x88e6A0c2dDD26FEEb64F039a2c41296FcB3f5640", "USDC", "WETH", 6, 18, 500, "WETH")
+WBTC_USDC = ScanPool("wbtc_usdc_3000", "0x99ac8cA7087fA4A2A1FB6357269965A2014ABc35", "ethereum", "WBTC", "USDC", 8, 6, 3000, "WBTC")
+USDC_WETH = ScanPool("weth_usdc_500", "0x88e6A0c2dDD26FEEb64F039a2c41296FcB3f5640", "ethereum", "USDC", "WETH", 6, 18, 500, "WETH")
 
 
 def sqrt_for(price_1per0_human: float, p: ScanPool) -> int:
@@ -113,3 +113,44 @@ def test_ingest_is_incremental(tmp_path):
     with engine.connect() as conn:
         n = sum(r.swaps for r in conn.execute(S.pool_hours.select()))
     assert n == len(logs)  # every swap counted exactly once across the two runs
+
+
+def test_base_token_and_markets_across_networks():
+    from backend.core.config import load_config
+    from backend.lab.scanner import base_of, scan_pools
+    assert base_of("USDC", "WETH") == "WETH" and base_of("WBTC", "USDC") == "WBTC"
+    assert base_of("WETH", "cbBTC") == "cbBTC" and base_of("WBTC", "WETH") == "WBTC"
+    cfg = load_config()
+    pools = {p.key: p for p in scan_pools(cfg, cfg.lab["scanner"]["pools"])}
+    assert pools["base_cbbtc_usdc_500"].asset_pair == pools["wbtc_usdc_3000"].asset_pair == "BTC/USD"
+    assert pools["arb_weth_usdc_500"].network == "arbitrum" and pools["op_weth_usdc_3000"].base == "WETH"
+
+
+class GasClient:
+    def __init__(self, base_fee, l1=None, arb=None):
+        self.base_fee, self.l1, self.arb = base_fee, l1, arb
+
+    def call(self, method, params):
+        return {"baseFeePerGas": hex(self.base_fee), "number": "0x10"}
+
+    def eth_call(self, to, data):
+        word = lambda x: x.to_bytes(32, "big").hex()
+        if self.l1 is not None:
+            return "0x" + word(self.l1)
+        return "0x" + "".join(word(x) for x in self.arb)
+
+
+def test_gas_cost_per_network_includes_l1_data_fee():
+    from backend.core.config import load_config
+    from backend.lab.scanner import gas_cost_usd
+    cfg = load_config()
+    units = cfg.lab["costs"]["gas_units"]
+    u = units["mint_new_position"] + units["decrease_liquidity_and_collect"]
+    eth = gas_cost_usd(GasClient(10 ** 9), cfg, "ethereum", 3000.0)
+    prio = cfg.lab["costs"]["priority_fee_gwei"] * 1e9
+    assert math.isclose(eth["usd"], u * (1e9 + prio) / 1e18 * 3000, rel_tol=1e-9)
+    op = gas_cost_usd(GasClient(10 ** 6, l1=10 ** 12), cfg, "base", 3000.0)      # 0.001 gwei + L1 fee
+    assert math.isclose(op["usd"], (u * (1e6 + 1e6) + 2e12) / 1e18 * 3000, rel_tol=1e-9)
+    arb = gas_cost_usd(GasClient(0, arb=[10 ** 9, 10 ** 6, 0, 0, 0, 10 ** 7]), cfg, "arbitrum", 3000.0)
+    assert math.isclose(arb["usd"], (2 * 1e9 + 2 * 700 * 1e6 + u * 1e7) / 1e18 * 3000, rel_tol=1e-9)
+    assert op["usd"] < eth["usd"] and arb["usd"] < eth["usd"]

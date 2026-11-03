@@ -22,7 +22,7 @@ const fmtPrice = (x: number) => num(x, x >= 1000 ? 0 : x >= 10 ? 2 : 4);
 
 export interface CardT {
   id: string; source: "exact" | "estimated"; tier: string; pair: string; network: string; pool_address: string;
-  fee_tier: number; price: number; token0: string; token1: string; price_lower: number; price_upper: number; deposit_usd: number;
+  fee_tier: number; price: number; token0: string; token1: string; network_ru?: string; gas_note?: string; price_lower: number; price_upper: number; deposit_usd: number;
   token0_amount: number; token1_amount: number; quote_share: number | null; base: string; quote: string;
   strategy: string; strategy_ru?: string; rule: string; horizon_days: number; fees_usd: [number, number]; il_usd: number;
   scenarios: { change: number; il_usd: number; position_change_usd: number }[];
@@ -57,7 +57,7 @@ export function SignalCard({ c, capital, share }: { c: CardT; capital: number | 
   return (
     <div className="card opp">
       <div className="card-head">
-        <h2>{c.pair} · комиссия пула {pctAbs(c.fee_tier, 2)}</h2>
+        <h2>{c.pair} · {pctAbs(c.fee_tier, 2)} · {c.network_ru ?? "Ethereum"}</h2>
         <div className="card-right">
           <Pill tone={t.tone}>{t.name}</Pill>
           <Pill tone={c.risk === "low" ? "pos" : c.risk === "medium" ? "warn" : "neg"}>риск {RISK_RU[c.risk]}</Pill>

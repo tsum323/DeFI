@@ -105,11 +105,13 @@ def open_from_scan(engine, cfg, scan: dict, exclude_pools: set[str], n: int = 2,
     """Best scanner pools (other than the exactly modelled one) -> ESTIMATED positions."""
     now = now or int(time.time())
     st = _settings(cfg)
-    open_pairs = {r.pair for r in _open_rows(engine) if r.kind == "estimated"}
+    open_pairs = {(cfg.pools[r.pool].network if r.pool in cfg.pools else "ethereum", r.pair)
+                  for r in _open_rows(engine) if r.kind == "estimated"}
     out = []
     for p in scan["pools"]:
         # one estimated position per pair (diversified; fee tiers of a pair move together)
-        if len(out) >= n or p["pool"] in exclude_pools or p["pair"] in open_pairs:
+        key = (p.get("network", "ethereum"), p["pair"])
+        if len(out) >= n or p["pool"] in exclude_pools or key in open_pairs:
             continue
         b = p.get("best")
         if p["score"] is None or not b or b["net_mid_usd"] <= 0 or p["problems"]:
@@ -130,8 +132,8 @@ def open_from_scan(engine, cfg, scan: dict, exclude_pools: set[str], n: int = 2,
                 opened_at=now, kind="estimated", tier="EXPERIMENTAL", pool=p["pool"], pair=p["pair"],
                 strategy=f"static ±{b['width']:.0%}", spec_hash=None, allocation_usd=alloc,
                 entry_json=json.dumps(entry), status="open"))
-        open_pairs.add(p["pair"])
-        out.append(f"EXPERIMENTAL: {p['pair']} {p['fee_tier']:.2%} ±{b['width']:.0%} на ${alloc:,.0f}")
+        open_pairs.add(key)
+        out.append(f"EXPERIMENTAL: {p['pair']} {p['fee_tier']:.2%} ({p.get('network_ru', 'Ethereum')}) ±{b['width']:.0%} на ${alloc:,.0f}")
     return out
 
 
@@ -153,10 +155,11 @@ def mark_estimated(row, scan_pool, hours: list, usd_now: dict) -> dict | None:
     if scan_pool is None:
         return None
     e = json.loads(row.entry_json)
-    usd = {"USDC": 1.0, "WETH": usd_now["ETH"], "WBTC": usd_now["BTC"]}
+    from backend.lab.scanner import ASSET
+    usd = {t: {"USD": 1.0, "ETH": usd_now["ETH"], "BTC": usd_now["BTC"]}[a] for t, a in ASSET.items()}
     u0, u1 = usd[scan_pool.token0], usd[scan_pool.token1]
     e0, e1 = e["usd"]["ETH"], e["usd"]["BTC"]
-    eu = {"USDC": 1.0, "WETH": e0, "WBTC": e1}
+    eu = {t: {"USD": 1.0, "ETH": e0, "BTC": e1}[a] for t, a in ASSET.items()}
     first = next((h for h in hours if h.hour_ts >= e["since_hour"]), None)
     if first is None:
         return {"days": 0.0, "value_usd": row.allocation_usd, "net_usd": 0.0, "fees_usd": 0.0, "il_usd": 0.0,
@@ -257,7 +260,10 @@ def summary(engine, cfg, now: int | None = None) -> dict:
         base, quote = r.pair.split("/")
         plain = (describe(params[r.spec_hash], base, quote) if r.spec_hash in params
                  else describe_static(r.strategy))
+        from backend.lab.scanner import NETWORK_RU
+        net = cfg.pools[r.pool].network if r.pool in cfg.pools else "ethereum"
         pos.append({"id": r.id, "opened_at": r.opened_at, "kind": r.kind, "tier": r.tier, "pool": r.pool,
+                    "network": net, "network_ru": NETWORK_RU.get(net, net),
                     "pair": r.pair, "strategy": r.strategy, "strategy_ru": plain, "allocation_usd": r.allocation_usd,
                     "entry": json.loads(r.entry_json), "mark": m, "status": r.status,
                     "closed_at": r.closed_at, "close_reason": r.close_reason})

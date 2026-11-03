@@ -58,12 +58,13 @@ class UniswapV3Deployment(BaseModel):
 
 class Network(BaseModel):
     chain_id: int
-    block_time_seconds: int
+    block_time_seconds: float
     native_symbol: str
     rpc: list[dict]
     indexers: dict[str, dict]
     oracles: dict[str, str] = {}
     uniswap_v3: UniswapV3Deployment
+    rollup: str | None = None      # op_stack | arbitrum (L2 data fee) | None (Ethereum)
 
 
 class LabConfig(BaseModel):

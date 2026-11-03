@@ -51,7 +51,8 @@ def _exact_card(o: dict) -> dict:
     h = o["historical"]
     return {
         "id": "x-" + o["spec_hash"][:12], "source": "exact", "tier": o["tier"], "pair": o["pair"],
-        "network": o["network"], "pool": o["pool"], "pool_address": o["pool_address"], "fee_tier": o["fee_tier"],
+        "network": o["network"], "network_ru": "Ethereum", "pool": o["pool"], "pool_address": o["pool_address"],
+        "fee_tier": o["fee_tier"],
         "price": o["current_price"], "price_lower": rng["price_lower"], "price_upper": rng["price_upper"],
         "deposit_usd": a["deposit_usd"], "token0_amount": a["token0"], "token1_amount": a["token1"],
         "quote_share": a.get("usdc_value_share"), "base": "WBTC", "quote": "USDC", "token0": "WBTC", "token1": "USDC",
@@ -94,7 +95,9 @@ def _scan_card(p: dict, scan: dict) -> dict | None:
     p_exit = b["exit_probability"]
     risk = "high" if p_exit > 0.4 or (p["volatility_7d"] or 0) > 0.8 else "medium" if p_exit > 0.15 else "low"
     return {
-        "id": f"s-{p['pool']}", "source": "estimated", "tier": "EXPERIMENTAL", "pair": p["pair"], "network": "ethereum",
+        "id": f"s-{p['pool']}", "source": "estimated", "tier": "EXPERIMENTAL", "pair": p["pair"],
+        "network": p.get("network", "ethereum"), "network_ru": p.get("network_ru", "Ethereum"),
+        "gas_note": p.get("gas_note"),
         "pool": p["pool"], "pool_address": p["address"], "fee_tier": p["fee_tier"], "price": p["price"],
         "price_lower": b["price_lower"], "price_upper": b["price_upper"], "deposit_usd": scan["capital_usd"],
         "token0_amount": b["amount0"], "token1_amount": b["amount1"], "quote_share": b["share_quote_value"],
@@ -115,7 +118,8 @@ def _scan_card(p: dict, scan: dict) -> dict | None:
         "invalidation": ["цена выйдет за диапазон", "объём торгов упадёт ниже $100 000 за сутки",
                          "волатильность вырастет в 1,5 раза"],
         "valid_until": scan["created_at"] + scan["horizon_days"] * 86_400, "label": "ESTIMATED",
-        "token_risks": p["token_risks"], "fee_calibration": (scan.get("fee_calibration") or {}).get("factor"),
+        "token_risks": p["token_risks"] + ([p["network_risk"]] if p.get("network_risk") else []),
+        "fee_calibration": (scan.get("fee_calibration") or {}).get("factor"),
         "variants": [],
     }
 
@@ -154,15 +158,16 @@ def _mid(c: dict) -> float:
     return (c["net_usd"][0] + c["net_usd"][1]) / 2
 
 
-def best_today(cards: list[dict], n: int = 4) -> list[str]:
+def best_today(cards: list[dict], n: int = 6) -> list[str]:
     """Ids of the day's best choices: the best (most proven, then highest expected result
     with a positive lower bound preferred) card of every pair; for the exactly modelled
     pool also the best of a second tier, so there is a safer and a bolder option."""
     out, seen = [], set()
     ordered = sorted(cards, key=lambda c: (TIER_ORDER[c["tier"]], c["net_usd"][0] <= 0, -_mid(c)))
-    for c in ordered:
-        if c["pair"] not in seen and _mid(c) > 0:
-            seen.add(c["pair"])
+    for c in ordered:   # one per (network, pair)
+        key = (c.get("network", "ethereum"), c["pair"])
+        if key not in seen and _mid(c) > 0:
+            seen.add(key)
             out.append(c)
     exact = [c for c in ordered if c["source"] == "exact" and c not in out and _mid(c) > 0]
     first = next((c for c in out if c["source"] == "exact"), None)
@@ -228,11 +233,12 @@ def add_entry_prices(cards: list[dict], scan: dict) -> None:
     pools = scan.get("pools", [])
     ref: dict = {}
     for p in pools:
-        if p.get("vwap_7d") and (p["pair"] not in ref or p["volume_usd"]["7d"] > ref[p["pair"]]["volume_usd"]["7d"]):
-            ref[p["pair"]] = p
+        k = (p.get("network", "ethereum"), p["pair"])
+        if p.get("vwap_7d") and (k not in ref or p["volume_usd"]["7d"] > ref[k]["volume_usd"]["7d"]):
+            ref[k] = p
     by_pool = {p["pool"]: p for p in pools}
     for c in cards:
-        r, own = ref.get(c["pair"]), by_pool.get(c["pool"])
+        r, own = ref.get((c.get("network", "ethereum"), c["pair"])), by_pool.get(c["pool"])
         c["base_usd"] = own.get("base_usd") if own else None
         c["quote_usd"] = own.get("quote_usd") if own else None
         if r is None:

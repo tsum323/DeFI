@@ -25,6 +25,45 @@ tokens:
       address: "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"
       decimals: 18
 
+  # L2 tokens: symbol() and decimals() checked on-chain (GitHub Actions, 2026-11-03).
+  # USDC = Circle's native USDC; USDC.e = the older bridged copy (do not mix up).
+  base:
+    WETH:
+      address: "0x4200000000000000000000000000000000000006"
+      decimals: 18
+    USDC:
+      address: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"
+      decimals: 6
+    cbBTC:
+      address: "0xcbB7C0000aB88B473b1f5aFd9ef808440eed33Bf"
+      decimals: 8
+  arbitrum:
+    WETH:
+      address: "0x82aF49447D8a07e3bd95BD0d56f35241523fBab1"
+      decimals: 18
+    USDC:
+      address: "0xaf88d065e77c8cC2239327C5EDb3A432268e5831"
+      decimals: 6
+    USDC.e:
+      address: "0xFF970A61A04b1cA14834A43f5dE4533eBDDB5CC8"
+      decimals: 6
+    WBTC:
+      address: "0x2f2a2543B76A4166549F7aaB2e75Bef0aefC5B0f"
+      decimals: 8
+  optimism:
+    WETH:
+      address: "0x4200000000000000000000000000000000000006"
+      decimals: 18
+    USDC:
+      address: "0x0b2C639c533813f4Aa9D7837CAf62653d097Ff85"
+      decimals: 6
+    USDC.e:
+      address: "0x7F5c764cBc14f9669B88837ca1490cCa17c31607"
+      decimals: 6
+    WBTC:
+      address: "0x68f180fcCe6836688e9084f035309E29Bf0A2095"
+      decimals: 8
+
 pools:
   wbtc_usdc_3000:
     network: ethereum
@@ -99,6 +138,106 @@ pools:
     tick_spacing: 60
     address: "0xCBCdF9626bC03E24f779434178A73a0B4bad62eD"
     status: verified_onchain   # factory.getPool == CREATE2 derivation (2026-11-03)
+  # L2 scanner pools (UNISWAP AI LAB): picked by liquidity and activity
+  base_weth_usdc_500:
+    network: base
+    protocol: uniswap_v3
+    token0: WETH
+    token1: USDC
+    fee: 500
+    tick_spacing: 10
+    address: "0xd0b53D9277642d899DF5C87A3966A349A798F224"
+    status: verified_onchain   # factory.getPool == CREATE2 (GitHub Actions check, 2026-11-03)
+  base_weth_usdc_3000:
+    network: base
+    protocol: uniswap_v3
+    token0: WETH
+    token1: USDC
+    fee: 3000
+    tick_spacing: 60
+    address: "0x6c561B446416E1A00E8E93E221854d6eA4171372"
+    status: verified_onchain   # factory.getPool == CREATE2 (GitHub Actions check, 2026-11-03)
+  base_cbbtc_usdc_500:
+    network: base
+    protocol: uniswap_v3
+    token0: USDC
+    token1: cbBTC
+    fee: 500
+    tick_spacing: 10
+    address: "0xfBB6Eed8e7aa03B138556eeDaF5D271A5E1e43ef"
+    status: verified_onchain   # factory.getPool == CREATE2 (GitHub Actions check, 2026-11-03)
+  base_cbbtc_usdc_3000:
+    network: base
+    protocol: uniswap_v3
+    token0: USDC
+    token1: cbBTC
+    fee: 3000
+    tick_spacing: 60
+    address: "0xeC558e484cC9f2210714E345298fdc53B253c27D"
+    status: verified_onchain   # factory.getPool == CREATE2 (GitHub Actions check, 2026-11-03)
+  base_cbbtc_weth_500:
+    network: base
+    protocol: uniswap_v3
+    token0: WETH
+    token1: cbBTC
+    fee: 500
+    tick_spacing: 10
+    address: "0x7AeA2E8A3843516afa07293a10Ac8E49906dabD1"
+    status: verified_onchain   # factory.getPool == CREATE2 (GitHub Actions check, 2026-11-03)
+  arb_weth_usdc_500:
+    network: arbitrum
+    protocol: uniswap_v3
+    token0: WETH
+    token1: USDC
+    fee: 500
+    tick_spacing: 10
+    address: "0xC6962004f452bE9203591991D15f6b388e09E8D0"
+    status: verified_onchain   # factory.getPool == CREATE2 (GitHub Actions check, 2026-11-03)
+  arb_weth_usdc_3000:
+    network: arbitrum
+    protocol: uniswap_v3
+    token0: WETH
+    token1: USDC
+    fee: 3000
+    tick_spacing: 60
+    address: "0xc473e2aEE3441BF9240Be85eb122aBB059A3B57c"
+    status: verified_onchain   # factory.getPool == CREATE2 (GitHub Actions check, 2026-11-03)
+  arb_wbtc_usdc_500:
+    network: arbitrum
+    protocol: uniswap_v3
+    token0: WBTC
+    token1: USDC
+    fee: 500
+    tick_spacing: 10
+    address: "0x0E4831319A50228B9e450861297aB92dee15B44F"
+    status: verified_onchain   # factory.getPool == CREATE2 (GitHub Actions check, 2026-11-03)
+  arb_wbtc_weth_500:
+    network: arbitrum
+    protocol: uniswap_v3
+    token0: WBTC
+    token1: WETH
+    fee: 500
+    tick_spacing: 10
+    address: "0x2f5e87C9312fa29aed5c179E456625D79015299c"
+    status: verified_onchain   # factory.getPool == CREATE2 (GitHub Actions check, 2026-11-03)
+  op_weth_usdc_500:
+    network: optimism
+    protocol: uniswap_v3
+    token0: USDC
+    token1: WETH
+    fee: 500
+    tick_spacing: 10
+    address: "0x1fb3cf6e48F1E7B10213E7b6d87D4c073C7Fdb7b"
+    status: verified_onchain   # factory.getPool == CREATE2 (GitHub Actions check, 2026-11-03)
+  op_weth_usdc_3000:
+    network: optimism
+    protocol: uniswap_v3
+    token0: USDC
+    token1: WETH
+    fee: 3000
+    tick_spacing: 60
+    address: "0xc1738D90E2E26C35784A0d3E3d8A9f795074bcA4"
+    status: verified_onchain   # factory.getPool == CREATE2 (GitHub Actions check, 2026-11-03)
 
 research:
   primary_pool: wbtc_usdc_3000   # final choice after stage-2 activity comparison (3000 vs 500)

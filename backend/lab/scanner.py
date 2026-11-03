@@ -40,21 +40,36 @@ WIDTHS = (0.02, 0.05, 0.10, 0.20, 0.30)     # symmetric ranges around the curren
 CAPITAL_USD = 10_000.0                      # reference size for the comparison (scales)
 HORIZON_DAYS = 7
 
-# base / quote shown to the user (price of 1 base in quote)
-BASE = {"wbtc_usdc_3000": "WBTC", "wbtc_usdc_500": "WBTC", "weth_usdc_100": "WETH",
-        "weth_usdc_500": "WETH", "weth_usdc_3000": "WETH", "wbtc_weth_100": "WBTC",
-        "wbtc_weth_500": "WBTC", "wbtc_weth_3000": "WBTC"}
+# what each token is worth: USD stablecoins, ETH, BTC
+ASSET = {"USDC": "USD", "USDC.e": "USD", "WETH": "ETH", "WBTC": "BTC", "cbBTC": "BTC"}
 TOKEN_RISK = {
     "WBTC": "WBTC — обёртка биткоина у кастодиана (BitGo/BiT Global); цена зависит от возможности выкупа",
+    "cbBTC": "cbBTC — биткоин, который хранит Coinbase; цена зависит от возможности выкупа у Coinbase",
     "USDC": "USDC — доллар Circle; был кратковременный отвяз в марте 2023",
+    "USDC.e": "USDC.e — старая копия USDC, перенесённая через мост; зависит ещё и от моста",
     "WETH": "WETH — обёрнутый эфир (контракт без кастодиана)",
 }
+NETWORK_RU = {"ethereum": "Ethereum", "base": "Base", "arbitrum": "Arbitrum", "optimism": "Optimism"}
+NETWORK_RISK = {
+    "base": "Base — сеть второго уровня от Coinbase: деньги сначала переводятся через мост; блоки собирает один оператор (Coinbase)",
+    "arbitrum": "Arbitrum — сеть второго уровня: деньги переводятся через мост; блоки собирает один оператор (Offchain Labs)",
+    "optimism": "Optimism — сеть второго уровня: деньги переводятся через мост; блоки собирает один оператор (OP Labs)",
+}
+
+
+def base_of(t0: str, t1: str) -> str:
+    """Which token is quoted: the non-dollar one; for BTC/ETH pairs the BTC token."""
+    a0, a1 = ASSET.get(t0), ASSET.get(t1)
+    if a1 == "USD" or (a0 == "BTC" and a1 == "ETH"):
+        return t0
+    return t1
 
 
 @dataclass(frozen=True)
 class ScanPool:
     key: str
     address: str
+    network: str
     token0: str
     token1: str
     dec0: int
@@ -67,6 +82,11 @@ class ScanPool:
         return f"{self.base}/{self.quote}"
 
     @property
+    def asset_pair(self) -> str:
+        """ETH/USD, BTC/USD, BTC/ETH — the same market on every network and token flavour."""
+        return f"{ASSET.get(self.base)}/{ASSET.get(self.quote)}"
+
+    @property
     def quote(self) -> str:
         return self.token1 if self.base == self.token0 else self.token0
 
@@ -76,8 +96,46 @@ def scan_pools(cfg, keys: list[str]) -> list[ScanPool]:
     for k in keys:
         p = cfg.pools[k]
         t = cfg.tokens[p.network]
-        out.append(ScanPool(k, p.address, p.token0, p.token1, t[p.token0].decimals,
-                            t[p.token1].decimals, p.fee, BASE.get(k, p.token0)))
+        out.append(ScanPool(k, p.address, p.network, p.token0, p.token1, t[p.token0].decimals,
+                            t[p.token1].decimals, p.fee, base_of(p.token0, p.token1)))
+    return out
+
+
+# ---------------------------------------------------------------- endpoints per network
+def scanner_clients(cfg, networks: set[str]) -> tuple[dict, dict]:
+    """One working read-only client per network (the configured endpoint first, then the
+    others in config order). Returns ({network: client}, {network: error})."""
+    from backend.data_engine.rpc import EndpointUnavailable, RpcError, build_clients
+    prefs = cfg.lab["scanner"].get("networks", {})
+    out, errors = {}, {}
+    for net in sorted(networks):
+        clients, notes = build_clients(cfg.networks[net])
+        pref = prefs.get(net, {}).get("endpoint")
+        clients.sort(key=lambda c: c.name != pref)
+        for c in clients:
+            try:
+                if c.chain_id() == cfg.networks[net].chain_id:
+                    out[net] = c
+                    break
+            except (EndpointUnavailable, RpcError, OSError) as exc:
+                notes.append(f"{c.name}: {str(exc)[:100]}")
+        if net not in out:
+            errors[net] = "; ".join(notes) or "no endpoint"
+    return out, errors
+
+
+def ingest_all(engine, cfg, clients: dict, pools: list[ScanPool], max_seconds: float = 300) -> list[dict]:
+    """Incremental Swap logs for every network that has a client (time split evenly)."""
+    prefs = cfg.lab["scanner"].get("networks", {})
+    nets = [n for n in sorted({p.network for p in pools}) if n in clients]
+    out = []
+    for net in nets:
+        pr = prefs.get(net, {})
+        out.append(ingest(engine, clients[net], [p for p in pools if p.network == net],
+                          backfill_days=pr.get("backfill_days", cfg.lab["scanner"]["backfill_days"]),
+                          step=pr.get("step", 100), batch=pr.get("batch", 3),
+                          max_seconds=max_seconds / max(1, len(nets)),
+                          block_time=cfg.networks[net].block_time_seconds, network=net))
     return out
 
 
@@ -169,17 +227,25 @@ def store_hours(conn, agg: dict[tuple[str, int], dict]) -> None:
                                  last_block=h["last_block"]))
 
 
+def stream_for(network: str) -> str:
+    return STREAM if network == "ethereum" else f"{STREAM}:{network}"
+
+
 def ingest(engine, client, pools: list[ScanPool], *, backfill_days: int = 30, step: int = 100,
            batch: int = 3, max_seconds: float = 900, confirmations: int = 6,
-           start_block: int | None = None, log=print) -> dict:
-    """Fetch Swap logs of all pools after the last processed block (incremental).
-    The first run starts `backfill_days` back. Stops after `max_seconds` (resumes later)."""
+           start_block: int | None = None, block_time: float = 12.0, network: str = "ethereum",
+           log=print) -> dict:
+    """Fetch Swap logs of all pools of ONE network after the last processed block
+    (incremental). The first run starts `backfill_days` back. The block window shrinks
+    automatically when an endpoint rejects it. Stops after `max_seconds` (resumes later)."""
+    from backend.data_engine.rpc import EndpointUnavailable, RpcError
     t0 = time.monotonic()
+    stream = stream_for(network)
     head = client.block_number() - confirmations
     with engine.connect() as c:
-        st = c.execute(select(S.scan_state).where(S.scan_state.c.stream == STREAM)).first()
+        st = c.execute(select(S.scan_state).where(S.scan_state.c.stream == stream)).first()
     start = st.last_block + 1 if st else (start_block if start_block is not None
-                                           else max(0, head - backfill_days * DAY // 12))
+                                           else max(0, head - int(backfill_days * DAY / block_time)))
     first = st.first_block if st else start
     by_addr = {p.address.lower(): p for p in pools}
     addrs = [p.address for p in pools]
@@ -190,23 +256,30 @@ def ingest(engine, client, pools: list[ScanPool], *, backfill_days: int = 30, st
         while b <= head and len(ranges) < batch:
             ranges.append((b, min(head, b + step - 1)))
             b += step
-        res = client.batch([("eth_getLogs", [{"address": addrs, "topics": [SWAP_TOPIC],
-                                              "fromBlock": hex(lo), "toBlock": hex(hi)}]) for lo, hi in ranges])
+        try:
+            res = client.batch([("eth_getLogs", [{"address": addrs, "topics": [SWAP_TOPIC],
+                                                  "fromBlock": hex(lo), "toBlock": hex(hi)}]) for lo, hi in ranges])
+        except (EndpointUnavailable, RpcError):
+            if step <= 10:
+                raise
+            step = max(10, step // 4)   # window too large for this endpoint: retry smaller
+            batch = 1
+            continue
         logs = sorted((lg for r in res for lg in r), key=lambda g: (int(g["blockNumber"], 16), int(g["logIndex"], 16)))
         with engine.begin() as conn:
             store_hours(conn, aggregate_logs(logs, by_addr))
             values = {"first_block": first, "last_block": ranges[-1][1], "updated_at": int(time.time())}
             if st is None:
-                conn.execute(insert(S.scan_state).values(stream=STREAM, **values))
+                conn.execute(insert(S.scan_state).values(stream=stream, **values))
                 st = True
             else:
-                conn.execute(update(S.scan_state).where(S.scan_state.c.stream == STREAM).values(**values))
+                conn.execute(update(S.scan_state).where(S.scan_state.c.stream == stream).values(**values))
         done = ranges[-1][1]
         n_logs += len(logs)
     if done < head:
         log(f"  scanner: stopped at block {done} ({head - done} blocks left, resumes next run)")
-    return {"from_block": start, "to_block": done, "head": head, "logs": n_logs,
-            "complete": done >= head, "seconds": round(time.monotonic() - t0)}
+    return {"network": network, "from_block": start, "to_block": done, "head": head, "logs": n_logs,
+            "complete": done >= head, "seconds": round(time.monotonic() - t0), "step": step}
 
 
 # ---------------------------------------------------------------- current state
@@ -216,7 +289,7 @@ def _word(hexdata: str, i: int) -> int:
 
 def read_state(client, p: ScanPool, cfg) -> dict:
     """slot0, active liquidity and token balances of the pool (EXACT, eth_call)."""
-    t = cfg.tokens["ethereum"]
+    t = cfg.tokens[p.network]
     slot0 = client.eth_call(p.address, encode_call("slot0()"))
     liq = int(client.eth_call(p.address, encode_call("liquidity()")), 16)
     bal0 = int(client.eth_call(t[p.token0].address, encode_call("balanceOf(address)", p.address)), 16)
@@ -342,21 +415,77 @@ def price_stats(hours: list, p: ScanPool) -> dict:
     return {"vwap_7d": vwap, "low_7d": min(closes), "high_7d": max(closes)}
 
 
-# ---------------------------------------------------------------- scan
-def scan(engine, client, cfg, pools: list[ScanPool], now: int | None = None) -> dict:
-    now = now or int(time.time())
-    eth_usd = eth_usd_now(client, cfg)
-    block = client.call("eth_getBlockByNumber", ["latest", False])
-    base_fee = int(block["baseFeePerGas"], 16)
-    prio = cfg.lab["costs"]["priority_fee_gwei"] * 1e9
+# ---------------------------------------------------------------- gas per network
+TX_BYTES = 700                 # typical signed size of a mint / collect transaction
+OP_GAS_ORACLE = "0x420000000000000000000000000000000000000F"
+ARB_GAS_INFO = "0x000000000000000000000000000000000000006C"
+
+
+def gas_cost_usd(client, cfg, network: str, eth_usd: float) -> dict:
+    """Gas to open and close a position on `network` (two transactions), in USD.
+    Ethereum: execution gas x (base fee + priority). L2s also pay for publishing the
+    transaction on Ethereum: OP Stack — GasPriceOracle.getL1FeeUpperBound(size);
+    Arbitrum — ArbGasInfo.getPricesInWei (per L2 tx, per L1 calldata byte, per gas)."""
     gas = cfg.lab["costs"]["gas_units"]
-    gas_usd = (gas["mint_new_position"] + gas["decrease_liquidity_and_collect"]) * (base_fee + prio) / 1e18 * eth_usd
-    states = {p.key: read_state(client, p, cfg) for p in pools}
+    units = (gas["mint_new_position"], gas["decrease_liquidity_and_collect"])
+    rollup = cfg.networks[network].rollup
+    block = client.call("eth_getBlockByNumber", ["latest", False])
+    base_fee = int(block.get("baseFeePerGas", "0x0"), 16)
+    if rollup == "arbitrum":
+        prices = client.eth_call(ARB_GAS_INFO, encode_call("getPricesInWei()"))
+        per_tx, per_byte, per_gas = _word(prices, 0), _word(prices, 1), _word(prices, 5)
+        wei = sum(per_tx + TX_BYTES * per_byte + u * per_gas for u in units)
+        note = "газ Arbitrum (включая плату за запись в Ethereum)"
+    else:
+        prio = (cfg.lab["costs"]["priority_fee_gwei"] if rollup is None else 0.001) * 1e9
+        wei = sum(u * (base_fee + prio) for u in units)
+        note = "газ Ethereum (базовая плата блока + чаевые)"
+        if rollup == "op_stack":
+            l1 = int(client.eth_call(OP_GAS_ORACLE, encode_call("getL1FeeUpperBound(uint256)", TX_BYTES)), 16)
+            wei += 2 * l1
+            note = "газ сети + плата за запись в Ethereum (верхняя оценка)"
+    return {"usd": wei / 1e18 * eth_usd, "base_fee_gwei": base_fee / 1e9, "block": int(block["number"], 16),
+            "note": note, "label": "ESTIMATED" if rollup else "EXACT inputs"}
+
+
+# ---------------------------------------------------------------- scan
+def scan(engine, clients, cfg, pools: list[ScanPool], now: int | None = None,
+         loading: set[str] | None = None) -> dict:
+    """`clients`: {network: RpcClient} (a single client = Ethereum only, as before).
+    `loading`: networks whose history is still being fetched (their pools are not ranked)."""
+    loading = loading or set()
+    if not isinstance(clients, dict):
+        clients = {"ethereum": clients}
+    now = now or int(time.time())
+    client = clients["ethereum"]
+    eth_usd = eth_usd_now(client, cfg)
+    gas_by_net, net_errors = {}, {}
+    for net in {p.network for p in pools}:
+        if net not in clients:
+            net_errors[net] = "нет доступного узла сети"
+            continue
+        try:
+            gas_by_net[net] = gas_cost_usd(clients[net], cfg, net, eth_usd)
+        except Exception as exc:  # noqa: BLE001 - a network that fails is reported, not hidden
+            net_errors[net] = f"{type(exc).__name__}: {str(exc)[:160]}"
+    eth_gas = gas_by_net.get("ethereum", {})
+    base_fee = eth_gas.get("base_fee_gwei", 0.0) * 1e9
+    eth_gas_usd = eth_gas.get("usd", 0.0)
+    block = {"number": hex(eth_gas.get("block", 0))}
+    states = {}
+    for p in pools:
+        if p.network not in gas_by_net:
+            continue
+        try:
+            states[p.key] = read_state(clients[p.network], p, cfg)
+        except Exception as exc:  # noqa: BLE001
+            net_errors.setdefault(p.network, f"{type(exc).__name__}: {str(exc)[:160]}")
     calib = get_state(engine, "scanner_fee_calibration") or {}
     fee_k = calib.get("factor") or 1.0
     btc = next((base_price(states[k]["sqrt_price"], p) for k in ("wbtc_usdc_3000", "wbtc_usdc_500")
-                for p in pools if p.key == k), None)
-    usd = {"USDC": 1.0, "WETH": eth_usd, "WBTC": btc}
+                for p in pools if p.key == k and k in states), None)
+    asset_usd = {"USD": 1.0, "ETH": eth_usd, "BTC": btc}
+    usd = {t: asset_usd[a] for t, a in ASSET.items()}
     with engine.connect() as c:
         rows = c.execute(select(S.pool_hours).where(S.pool_hours.c.hour_ts >= now - 31 * DAY)
                          .order_by(S.pool_hours.c.hour_ts)).all()
@@ -365,14 +494,17 @@ def scan(engine, client, cfg, pools: list[ScanPool], now: int | None = None) -> 
         by_pool.setdefault(r.pool, []).append(r)
     # volatility per PAIR, from its most active pool (thin pools have stale closes)
     pair_vol = {}
-    for pk in {p.pair_key for p in pools}:
-        same = [p for p in pools if p.pair_key == pk]
+    for pk in {p.asset_pair for p in pools}:
+        same = [p for p in pools if p.asset_pair == pk]
         top = max(same, key=lambda p: sum(h.swaps for h in by_pool.get(p.key, [])))
         pair_vol[pk] = realized_vol([h for h in by_pool.get(top.key, []) if h.hour_ts >= now - 7 * DAY], top)
     results = []
     for p in pools:
+        if p.key not in states:
+            continue
         st, hrs = states[p.key], by_pool.get(p.key, [])
         u0, u1 = usd[p.token0], usd[p.token1]
+        gas_usd = gas_by_net[p.network]["usd"]
         if u0 is None or u1 is None:
             continue
 
@@ -384,7 +516,7 @@ def scan(engine, client, cfg, pools: list[ScanPool], now: int | None = None) -> 
         vol_usd = {k: sum(max(h.vol0 * u0, h.vol1 * u1) for h in hs) for k, hs in (("24h", h1), ("7d", h7), ("30d", hrs))}
         fees_usd = {k: sum(fee_usd(h) for h in hs) for k, hs in (("24h", h1), ("7d", h7), ("30d", hrs))}
         tvl = st["balance0"] * u0 + st["balance1"] * u1
-        sigma = pair_vol.get(p.pair_key)
+        sigma = pair_vol.get(p.asset_pair)
         sig_h = (sigma or 0) * math.sqrt(HORIZON_DAYS / 365)
         # active liquidity value within +-2% of the price
         act = position(p, st["sqrt_price"], 0.02, 1.0, u0, u1)
@@ -422,6 +554,8 @@ def scan(engine, client, cfg, pools: list[ScanPool], now: int | None = None) -> 
         ok = [r for r in ranges if r["exit_probability"] <= 0.5] or ranges
         best = max(ok, key=lambda r: r["net_mid_usd"] * (1 - r["exit_probability"])) if ok else None
         quality = []
+        if p.network in loading:
+            quality.append("история этой сети ещё загружается — оценка появится после загрузки")
         if span_days < 7:
             quality.append(f"история в сканере только {span_days:.1f} дн.")
         if len(h7) < 24 * 7 * 0.5:
@@ -437,6 +571,9 @@ def scan(engine, client, cfg, pools: list[ScanPool], now: int | None = None) -> 
             problems.append("ни один диапазон не даёт положительного ожидаемого результата после расходов")
         results.append({
             "pool": p.key, "pair": f"{p.base}/{p.quote}", "address": p.address, "fee_tier": p.fee / 1e6,
+            "network": p.network, "network_ru": NETWORK_RU.get(p.network, p.network),
+            "gas_open_close_usd": gas_usd, "gas_note": gas_by_net[p.network]["note"],
+            "network_risk": NETWORK_RISK.get(p.network),
             "token0": p.token0, "token1": p.token1,
             "price": base_price(st["sqrt_price"], p), "tick": st["tick"],
             "usd0": u0, "usd1": u1, "base_usd": u0 if p.base == p.token0 else u1,
@@ -454,7 +591,8 @@ def scan(engine, client, cfg, pools: list[ScanPool], now: int | None = None) -> 
         })
     results.sort(key=lambda r: -(r["score"] if r["score"] is not None else -99))
     return {"created_at": now, "block": int(block["number"], 16), "eth_usd": eth_usd, "btc_usd": btc,
-            "base_fee_gwei": base_fee / 1e9, "gas_open_close_usd": gas_usd, "capital_usd": CAPITAL_USD,
+            "base_fee_gwei": base_fee / 1e9, "gas_open_close_usd": eth_gas_usd, "capital_usd": CAPITAL_USD,
+            "gas_by_network": gas_by_net, "network_errors": net_errors,
             "horizon_days": HORIZON_DAYS, "fee_calibration": calib or None, "pools": results,
             "label": "ESTIMATED"}
 

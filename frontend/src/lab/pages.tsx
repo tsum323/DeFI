@@ -34,7 +34,7 @@ export function Dashboard() {
       {d.errors_24h.length > 0 && <Card title="Ошибки за сутки"><ul>{d.errors_24h.map((e: string) => <li key={e} className="neg">{e}</li>)}</ul></Card>}
       <Card title="Лучшие варианты сейчас" right={<Badge label="SCENARIO" />}>
         {d.best.length === 0 ? <p className="muted">Интересных вариантов сейчас нет — система продолжает исследование.</p> :
-          <ul>{d.best.map((c: CardT) => <li key={c.id}><b>{c.pair}</b> {pctAbs(c.fee_tier, 2)} · {TIER_RU[c.tier].name.toLowerCase()} ·
+          <ul>{d.best.map((c: CardT) => <li key={c.id}><b>{c.pair}</b> {pctAbs(c.fee_tier, 2)} · {c.network_ru ?? "Ethereum"} · {TIER_RU[c.tier].name.toLowerCase()} ·
             диапазон {num(c.price_lower, 0)}–{num(c.price_upper, 0)} · за {c.horizon_days} дн. на {usd(c.deposit_usd)}: <span className={sign(c.net_usd[0] + c.net_usd[1])}>{usd(c.net_usd[0])} … {usd(c.net_usd[1])}</span> к хранению · риск {RISK_RU[c.risk]}
             {c.label === "ESTIMATED" && <> <Badge label="ESTIMATED" /></>}</li>)}</ul>}
         <p className="muted">Подробно — в разделе «Сигналы».</p>
@@ -92,9 +92,11 @@ export function Signals() {
   const [picked, setPicked] = useStored("picked_card", "");
   const [amountS, setAmountS] = useStored("invest_amount", "1000");
   const [choice, setChoice] = useStored("amount_choice", "rec");
+  const [bestSort, setBestSort] = useStored("best_sort", "tier");
   if (!d) return <Loading error={error} />;
   const cards = d.cards as CardT[];
-  const best = (d.best_today as string[]).map((id) => cards.find((c) => c.id === id)).filter(Boolean) as CardT[];
+  const best0 = (d.best_today as string[]).map((id) => cards.find((c) => c.id === id)).filter(Boolean) as CardT[];
+  const best = bestSort === "net" ? [...best0].sort((a, b) => (b.net_usd[0] + b.net_usd[1]) / b.deposit_usd - (a.net_usd[0] + a.net_usd[1]) / a.deposit_usd) : best0;
   const c = cards.find((x) => x.id === picked) ?? best[0];
   const g = c?.amount_guide;
   const amount = choice === "rec" && g?.recommended != null ? g.recommended
@@ -109,10 +111,13 @@ export function Signals() {
       <p className="lead">Строгий сигнал: <b>{STATUS_RU[d.strict.status] ?? d.strict.status}</b>. {d.strict.text}</p>
 
       <h2 className="section">1. Лучшие стратегии на {date(d.ranking_at ?? d.scan_at).split(",")[0]}</h2>
+      <div className="tabs"><span className="muted">порядок:</span>
+        {[["tier", "сначала надёжнее"], ["net", "сначала больше заработок"]].map(([k, t]) =>
+          <button key={k} className={`pill${bestSort === k ? " warn" : ""}`} onClick={() => setBestSort(k)}>{t}</button>)}</div>
       {best.length === 0 ? <Card><p>Сегодня подходящих вариантов нет — система не создаёт сигналы ради заполнения экрана.</p></Card> :
         best.map((b) => (
           <button key={b.id} className={`card pick${c?.id === b.id ? " picked" : ""}`} onClick={() => setPicked(b.id)}>
-            <div className="card-head"><h2>{b.pair} · {pctAbs(b.fee_tier, 2)}</h2>
+            <div className="card-head"><h2>{b.pair} · {pctAbs(b.fee_tier, 2)} · {b.network_ru ?? "Ethereum"}</h2>
               <div className="card-right"><Pill tone={TIER_RU[b.tier].tone}>{TIER_RU[b.tier].name}</Pill>
                 <Pill tone={b.risk === "low" ? "pos" : b.risk === "medium" ? "warn" : "neg"}>риск {RISK_RU[b.risk]}</Pill><Badge label={b.label} /></div></div>
             <p>{b.strategy_ru ?? b.strategy}</p>
@@ -157,7 +162,7 @@ export function Signals() {
             <div className="kv">
               <span>Комиссии (доход)</span><span>{usd(r.fees[0], 2)} – {usd(r.fees[1], 2)}</span>
               <span>Потеря к хранению при обычном движении цены</span><span>{usd(r.il, 2)}</span>
-              <span>Газ (открыть + закрыть)</span><span>{usd(c.gas_usd, 2)}</span>
+              <span>Газ (открыть + закрыть)</span><span>{usd(c.gas_usd, 2)}{c.gas_note && <span className="muted"> · {c.gas_note}</span>}</span>
               <span>Обмен части {c.quote} на {c.base}</span><span>{usd(r.swap, 2)}</span>
               <span>Шанс, что цена выйдет из диапазона за {c.horizon_days} дн.</span><span>{pctAbs(c.exit_probability, 0)}</span>
               {r.breakEven != null && <><span>Минимальная разумная сумма</span><span className={amount < r.breakEven ? "warn" : ""}>~{usd(r.breakEven)} (иначе газ съедает доход)</span></>}
@@ -181,7 +186,8 @@ export function Signals() {
           <Card title="4. Как открыть на Uniswap (делаете вы сами)">
             <ol>
               <li>Откройте <b>app.uniswap.org</b> (набирайте адрес вручную) и подключите свой кошелёк.</li>
-              <li>Раздел «Pool» → «New position» → сеть <b>Ethereum</b>.</li>
+              <li>Раздел «Pool» → «New position» → сеть <b>{c.network_ru ?? "Ethereum"}</b>
+                {c.network_ru && c.network_ru !== "Ethereum" && <> (деньги должны уже быть в этой сети — перевод через мост делаете отдельно)</>}.</li>
               <li>Пара <b>{c.token0} / {c.token1}</b>, комиссия <b>{pctAbs(c.fee_tier, 2)}</b>. Адрес пула для проверки: <code>{c.pool_address}</code>.</li>
               <li>Диапазон: min <b>{fp(t0 ? r.Pa : 1 / r.Pb)}</b>, max <b>{fp(t0 ? r.Pb : 1 / r.Pa)}</b> {t0 ? `${c.token1} за 1 ${c.token0}` : `${c.token1} за 1 ${c.token0}`}
                 {!t0 && <> (в Uniswap можно переключить отображение на «{c.quote} за 1 {c.base}»: {fp(r.Pa)} – {fp(r.Pb)})</>}.</li>
@@ -210,7 +216,7 @@ function PosCard({ p }: { p: Any }) {
   const cell = (label: string, value: string, tone = "") => <div><span>{label}</span><b className={tone}>{value}</b></div>;
   return (
     <div className="vpos">
-      <div className="vpos-head"><b>{p.pair}</b> · {TIER_RU[p.tier]?.name}
+      <div className="vpos-head"><b>{p.pair}</b> · {p.network_ru ?? "Ethereum"} · {TIER_RU[p.tier]?.name}
         <span className="vpos-tags"><Badge label={p.kind === "exact" ? "MODELED" : "ESTIMATED"} />
           {m.in_range != null && <Pill tone={m.in_range ? "pos" : "neg"}>{m.in_range ? "в диапазоне" : "вне диапазона"}</Pill>}</span></div>
       <div className="vpos-desc">{p.strategy_ru ?? p.strategy}</div>

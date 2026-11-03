@@ -14,7 +14,7 @@ from backend.lab import portfolio as pf
 from backend.lab.scanner import ScanPool, position
 from backend.strategies.generator import StrategyParams
 
-WBTC_USDC = ScanPool("wbtc_usdc_500", "0x9a772018FbD77fcD2d25657e5C547BAfF3Fd7D16", "WBTC", "USDC", 8, 6, 500, "WBTC")
+WBTC_USDC = ScanPool("wbtc_usdc_500", "0x9a772018FbD77fcD2d25657e5C547BAfF3Fd7D16", "ethereum", "WBTC", "USDC", 8, 6, 500, "WBTC")
 
 
 def cfg_with(capital=10_000):

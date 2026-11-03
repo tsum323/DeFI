@@ -46,3 +46,61 @@ networks:
       nonfungible_position_manager: "0xC36442b4a4522E871399CD717aBDD847Ab11FE88"
       pool_init_code_hash: "0xe34f199b19b2b4f47f68442619d555527d244f78a3297ea89325f843f87b8b54"
       factory_deploy_block: 12369621   # TO VERIFY in stage 2 via eth_getCode bisection
+
+  # L2 networks (UNISWAP AI LAB scanner). Endpoints are free and keyless; checked from
+  # GitHub Actions on 2026-11-03 (the development sandbox cannot reach them).
+  base:
+    chain_id: 8453
+    block_time_seconds: 2
+    native_symbol: ETH
+    rollup: op_stack                # L1 data fee via GasPriceOracle
+    rpc:
+      - name: publicnode
+        url: https://base-rpc.publicnode.com
+      - name: drpc
+        url: https://base.drpc.org
+      - name: official
+        url: https://mainnet.base.org
+    indexers: {}
+    uniswap_v3:
+      factory: "0x33128a8fC17869897dcE68Ed026d694621f6FDfD"
+      nonfungible_position_manager: "0x03a520b32C04BF3bEEf7BEb72E919cf822Ed34f1"
+      pool_init_code_hash: "0xe34f199b19b2b4f47f68442619d555527d244f78a3297ea89325f843f87b8b54"
+      factory_deploy_block: 0       # not used by the scanner
+  arbitrum:
+    chain_id: 42161
+    block_time_seconds: 0.25
+    native_symbol: ETH
+    rollup: arbitrum                # L1 data fee via ArbGasInfo
+    rpc:
+      - name: drpc
+        url: https://arbitrum.drpc.org
+      - name: publicnode
+        url: https://arbitrum-one-rpc.publicnode.com
+      - name: official
+        url: https://arb1.arbitrum.io/rpc
+    indexers: {}
+    uniswap_v3:
+      factory: "0x1F98431c8aD98523631AE4a59f267346ea31F984"
+      nonfungible_position_manager: "0xC36442b4a4522E871399CD717aBDD847Ab11FE88"
+      pool_init_code_hash: "0xe34f199b19b2b4f47f68442619d555527d244f78a3297ea89325f843f87b8b54"
+      factory_deploy_block: 0
+  optimism:
+    chain_id: 10
+    block_time_seconds: 2
+    native_symbol: ETH
+    rollup: op_stack
+    rpc:
+      - name: publicnode
+        url: https://optimism-rpc.publicnode.com
+      - name: drpc
+        url: https://optimism.drpc.org
+      - name: official
+        url: https://mainnet.optimism.io
+    indexers: {}
+    uniswap_v3:
+      factory: "0x1F98431c8aD98523631AE4a59f267346ea31F984"
+      nonfungible_position_manager: "0xC36442b4a4522E871399CD717aBDD847Ab11FE88"
+      pool_init_code_hash: "0xe34f199b19b2b4f47f68442619d555527d244f78a3297ea89325f843f87b8b54"
+      factory_deploy_block: 0
+

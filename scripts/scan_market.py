@@ -14,7 +14,7 @@ from backend.core.config import load_config
 from backend.data_engine.rpc import EndpointUnavailable, RpcError, build_clients
 from backend.database import schema as S
 from backend.lab.activity import log_activity
-from backend.lab.scanner import ingest, save_scan, scan, scan_pools
+from backend.lab.scanner import ingest_all, save_scan, scan, scan_pools, scanner_clients
 
 
 def main() -> None:
@@ -25,19 +25,21 @@ def main() -> None:
     cfg = load_config()
     sc = cfg.lab["scanner"]
     engine = S.make_engine(cfg.lab["database"]["url"])
-    clients = {c.name: c for c in build_clients(cfg.networks["ethereum"])[0]}
-    client = clients.get(sc["endpoint"]) or next(iter(clients.values()))
     pools = scan_pools(cfg, sc["pools"])
+    eth = {c.name: c for c in build_clients(cfg.networks["ethereum"])[0]}
+    clients, errors = scanner_clients(cfg, {p.network for p in pools} - {"ethereum"})
+    clients["ethereum"] = eth.get(sc["endpoint"]) or next(iter(eth.values()))
+    for net, err in errors.items():
+        print(f"network {net}: unavailable ({err[:160]})")
     try:
+        loading = set()
         if not args.no_fetch:
-            r = ingest(engine, client, pools, backfill_days=sc["backfill_days"],
-                       max_seconds=args.max_minutes * 60)
-            print(f"scanner data: blocks {r['from_block']}..{r['to_block']} (head {r['head']}), "
-                  f"{r['logs']} swaps, {r['seconds']}s, complete={r['complete']}")
-            log_activity(engine, "data", "ok" if r["complete"] else "warn",
-                         f"Сканер: загружено {r['logs']} обменов по {len(pools)} пулам"
-                         + ("" if r["complete"] else " (не всё — продолжу в следующий раз)"), r)
-        res = scan(engine, client, cfg, pools)
+            for r in ingest_all(engine, cfg, clients, pools, args.max_minutes * 60):
+                if not r["complete"]:
+                    loading.add(r["network"])
+                print(f"{r['network']}: blocks {r['from_block']}..{r['to_block']} (head {r['head']}), "
+                      f"{r['logs']} swaps, {r['seconds']}s, window {r['step']}, complete={r['complete']}")
+        res = scan(engine, clients, cfg, pools, loading=loading)
     except (EndpointUnavailable, RpcError) as exc:
         log_activity(engine, "scan", "error", f"Сканер не смог получить данные: {exc}")
         raise SystemExit(f"scanner failed: {exc}") from exc
@@ -49,7 +51,7 @@ def main() -> None:
           f"(открыть+закрыть ${res['gas_open_close_usd']:.2f})")
     for p in res["pools"]:
         b = p["best"]
-        print(f"{p['pair']:10s} {p['fee_tier']:.2%}  цена {p['price']:,.4g}  TVL ${p['tvl_usd']:,.0f}  "
+        print(f"{p.get('network_ru', ''):9s}{p['pair']:11s} {p['fee_tier']:.2%}  цена {p['price']:,.4g}  TVL ${p['tvl_usd']:,.0f}  "
               f"объём 24ч ${p['volume_usd']['24h']:,.0f}  комиссии 24ч ${p['fees_usd']['24h']:,.0f}  "
               f"волат. {(p['volatility_7d'] or 0):.0%}  история {p['history_days']:.1f} дн.  "
               + (f"лучший ±{b['width']:.0%}: к HODL ${b['net_vs_hodl_usd'][0]:,.0f}…${b['net_vs_hodl_usd'][1]:,.0f} "
