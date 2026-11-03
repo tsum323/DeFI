@@ -118,7 +118,7 @@ export function Signals() {
             <p>{b.strategy_ru ?? b.strategy}</p>
             <p className="muted">Диапазон {fp(b.price_lower)} – {fp(b.price_upper)} {b.quote} · за {b.horizon_days} дн. на $1 000:{" "}
               <span className={sign(b.net_usd[0] + b.net_usd[1])}>{usd(b.net_usd[0] / b.deposit_usd * 1000, 2)} … {usd(b.net_usd[1] / b.deposit_usd * 1000, 2)}</span> к хранению
-              {c?.id === b.id && <b className="pos"> · выбрано</b>}</p>
+              {c?.id === b.id && <b className="vpos"> · выбрано</b>}</p>
           </button>))}
 
       {c && <>
@@ -204,26 +204,37 @@ export function Signals() {
 }
 
 // ---------------------------------------------------------------- Portfolio
-function PosRow({ p }: { p: Any }) {
+function PosCard({ p }: { p: Any }) {
   const m = p.mark ?? {};
+  const v = (x: number | null | undefined, d = 2) => (x == null ? "—" : usd(x, d));
+  const cell = (label: string, value: string, tone = "") => <div><span>{label}</span><b className={tone}>{value}</b></div>;
   return (
-    <tr><td><b>{p.pair}</b> · {TIER_RU[p.tier]?.name}<div>{p.strategy_ru ?? p.strategy}</div>
-      <div className="muted" style={{ fontSize: 11 }}>{p.strategy}</div></td>
-      <td>{date(p.opened_at)}<div className="muted">{num(p.entry.price, 0)} · {num(p.entry.range[0], 0)}–{num(p.entry.range[1], 0)}</div></td>
-      <td>{usd(p.allocation_usd)}</td><td>{m.value_usd != null ? usd(m.value_usd, 2) : "—"}</td>
-      <td className={sign(m.net_usd)}>{m.net_usd != null ? usd(m.net_usd, 2) : "—"}</td>
-      <td>{m.fees_usd != null ? usd(m.fees_usd, 2) : "—"}</td><td className={sign(m.il_usd)}>{m.il_usd != null ? usd(m.il_usd, 2) : "—"}</td>
-      <td>{m.costs_usd != null ? usd(m.costs_usd, 2) : "—"}</td>
-      <td className={sign(m.vs_hodl_usd)}>{m.vs_hodl_usd != null ? usd(m.vs_hodl_usd, 2) : "—"}</td>
-      <td>{m.in_range == null ? "—" : m.in_range ? "да" : "нет"}<div className="muted"><Badge label={p.kind === "exact" ? "MODELED" : "ESTIMATED"} /></div>
-        {p.close_reason && <div className="muted">{p.close_reason}</div>}</td></tr>);
+    <div className="vpos">
+      <div className="vpos-head"><b>{p.pair}</b> · {TIER_RU[p.tier]?.name}
+        <span className="vpos-tags"><Badge label={p.kind === "exact" ? "MODELED" : "ESTIMATED"} />
+          {m.in_range != null && <Pill tone={m.in_range ? "pos" : "neg"}>{m.in_range ? "в диапазоне" : "вне диапазона"}</Pill>}</span></div>
+      <div className="vpos-desc">{p.strategy_ru ?? p.strategy}</div>
+      <div className="vpos-grid">
+        {cell("Открыта", date(p.opened_at).replace(/\s\d{4}\sг\.,/, ",").replace(" МСК", ""))}
+        {cell("Цена входа", num(p.entry.price, p.entry.price >= 1000 ? 0 : 2))}
+        {cell("Диапазон", `${num(p.entry.range[0], p.entry.range[0] >= 1000 ? 0 : 2)} – ${num(p.entry.range[1], p.entry.range[1] >= 1000 ? 0 : 2)}`)}
+        {cell("Цена сейчас", m.price != null ? num(m.price, m.price >= 1000 ? 0 : 2) : "—")}
+        {cell("Вложено", usd(p.allocation_usd))}
+        {cell("Стоимость", v(m.value_usd))}
+        {cell("Итог", v(m.net_usd), sign(m.net_usd))}
+        {cell("К хранению", v(m.vs_hodl_usd), sign(m.vs_hodl_usd))}
+        {cell("Комиссии", v(m.fees_usd), "pos")}
+        {cell("Потеря к хранению", v(m.il_usd), sign(m.il_usd))}
+        {cell("Расходы", v(m.costs_usd))}
+        {cell("Время в диапазоне", m.time_in_range != null ? pctAbs(m.time_in_range, 0) : "—")}
+      </div>
+      {p.close_reason && <div className="vpos-desc">Закрыта: {p.close_reason}</div>}
+    </div>);
 }
 
 export function Portfolio() {
   const { data: d, error } = useApi<Any>("/api/lab/portfolio");
   if (!d) return <Loading error={error} />;
-  const head = <thead><tr><th>Пара</th><th>Открыта · цена · диапазон</th><th>Вложено</th><th>Стоимость</th><th>Итог</th>
-    <th>Комиссии</th><th>Потеря к хранению</th><th>Расходы</th><th>К хранению</th><th>В диапазоне</th></tr></thead>;
   return (
     <>
       <h1>Виртуальный портфель <Badge label="MODELED" /></h1>
@@ -233,16 +244,19 @@ export function Portfolio() {
         <Stat title="Начальный баланс" value={usd(d.initial_usd)} />
         <Stat title="Текущий баланс" label="MODELED" value={usd(d.balance_usd, 2)} tone={sign(d.pnl_usd)} hint={`свободно ${usd(d.cash_usd)}`} />
         <Stat title="Прибыль / убыток" value={usd(d.pnl_usd, 2)} tone={sign(d.pnl_usd)} hint={`за сутки ${d.day_change_usd == null ? "—" : usd(d.day_change_usd, 2)}`} />
-        <Stat title="Комиссии · потеря к хранению · расходы" value={`${usd(d.fees_usd, 2)} · ${usd(d.il_usd, 2)} · ${usd(d.costs_usd, 2)}`} />
+        <Stat title="Из чего итог" value={<div className="stat-lines">
+          <div><span>комиссии </span><b className="pos">{usd(d.fees_usd, 2)}</b></div>
+          <div><span>потеря к хранению </span><b className={sign(d.il_usd)}>{usd(d.il_usd, 2)}</b></div>
+          <div><span>расходы </span><b>{usd(d.costs_usd, 2)}</b></div></div>} />
       </div>
       {d.history.length > 1 && <Card title="Баланс по дням"><Spark values={d.history.map((h: Any) => h.balance_usd)} /></Card>}
       <Card title={`Открытые позиции: ${d.open.length}`}>
         {d.open.length === 0 ? <p className="muted">Открытых позиций нет.</p> :
-          <div className="table-wrap"><table className="table">{head}<tbody>{d.open.map((p: Any) => <PosRow key={p.id} p={p} />)}</tbody></table></div>}
+          d.open.map((p: Any) => <PosCard key={p.id} p={p} />)}
       </Card>
       <Card title={`Закрытые позиции: ${d.closed.length}`}>
         {d.closed.length === 0 ? <p className="muted">Закрытых пока нет (позиция закрывается через 30 дней или когда стратегия выпадает из рейтинга на 3 дня).</p> :
-          <div className="table-wrap"><table className="table">{head}<tbody>{d.closed.map((p: Any) => <PosRow key={p.id} p={p} />)}</tbody></table></div>}
+          d.closed.map((p: Any) => <PosCard key={p.id} p={p} />)}
       </Card>
       <p className="muted">МОДЕЛЬ — точная реконструкция пула WBTC/USDC 0,3%; ОЦЕНКА — часовые данные других пулов (приближённо).</p>
     </>);

@@ -91,3 +91,17 @@ details[open] > summary { margin-bottom: 6px; }
 @media (max-width: 640px) { .log-item { grid-template-columns: 1fr; } .kv { grid-template-columns: 1fr; } }
 button.card.pick { display: block; width: 100%; text-align: left; color: inherit; font: inherit; cursor: pointer; }
 button.card.pick.picked { border-color: var(--gold); box-shadow: 0 0 0 1px var(--gold) inset; }
+.vpos { border-top: 1px solid var(--line); padding: 12px 0; font-size: 13px; }
+.vpos:first-of-type { border-top: 0; }
+.vpos-head { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 14px; }
+.vpos-tags { margin-left: auto; display: flex; gap: 6px; align-items: center; }
+.vpos-desc { color: var(--muted); font-size: 12px; margin: 4px 0 8px; line-height: 1.4; }
+.vpos-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px 12px; }
+.vpos-grid > div { display: flex; flex-direction: column; min-width: 0; }
+.vpos-grid span { color: var(--muted); font-size: 11px; }
+.vpos-grid b { font-size: 13px; font-weight: 600; overflow-wrap: anywhere; }
+@media (max-width: 640px) {
+  .vpos-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .table { font-size: 12px; } .stat-value { font-size: 20px; } h1 { font-size: 22px; }
+}
+.stat-lines { font-size: 14px; line-height: 1.6; } .stat-lines span { color: var(--muted); }
