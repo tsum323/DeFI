@@ -376,6 +376,31 @@ portfolio_history = Table(  # one row per day: balance and its components
     Column("payload_json", Text, nullable=False),
 )
 
+# ------------------------------------------------------------ UNISWAP AI LAB: "my bot"
+bot_positions = Table(  # the user's virtual twin: one position at a time, its own money
+    "bot_positions", metadata,
+    Column("id", Integer, primary_key=True, autoincrement=True),
+    Column("opened_at", BigInteger, nullable=False),
+    Column("pool", String(64), nullable=False),
+    Column("network", String(16), nullable=False),
+    Column("pair", String(32), nullable=False),
+    Column("width", Float, nullable=False),
+    Column("allocation_usd", Float, nullable=False),
+    Column("entry_json", Text, nullable=False),
+    Column("status", String(8), nullable=False),        # open | closed
+    Column("mark_json", Text),
+    Column("out_of_range_since", BigInteger),
+    Column("closed_at", BigInteger),
+    Column("close_reason", Text),
+)
+
+bot_history = Table(
+    "bot_history", metadata,
+    Column("day", String(10), primary_key=True),
+    Column("created_at", BigInteger, nullable=False),
+    Column("payload_json", Text, nullable=False),
+)
+
 lab_state = Table(  # small named parameters the system learns (with history in `activity`)
     "lab_state", metadata,
     Column("key", String(64), primary_key=True),

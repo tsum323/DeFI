@@ -70,6 +70,11 @@ def lab_research():
     return L.research(engine)
 
 
+@app.get("/api/lab/bot")
+def lab_bot():
+    return L.bot(engine, cfg)
+
+
 @app.get("/api/lab/activity")
 def lab_activity():
     return L.activity(engine)

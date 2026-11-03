@@ -159,7 +159,7 @@ def main() -> None:
     data.mkdir(exist_ok=True)
     (data / "datasources.json").write_text(json.dumps(c.get("/api/datasources").json()))
     (data / "lab").mkdir(exist_ok=True)
-    for name in ("dashboard", "signals", "portfolio", "research", "activity"):
+    for name in ("dashboard", "signals", "portfolio", "research", "activity", "bot"):
         (data / "lab" / f"{name}.json").write_text(json.dumps(c.get(f"/api/lab/{name}").json()))
     ds = json.loads((data / "datasources.json").read_text())
     (data / "snapshot.json").write_text(json.dumps({

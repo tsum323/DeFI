@@ -88,3 +88,12 @@ portfolio:
   max_days: 30                      # a virtual position is closed and evaluated after this
   close_after_hours_out_of_ranking: 72
 
+# UNISWAP AI LAB: "my bot" — a virtual twin of the user with its own small capital
+# (backend/lab/bot.py). It holds one position at a time and reinvests the result.
+bot:
+  start_usd: 100
+  min_hold_days: 3            # no switching before this (unless the price left the range)
+  switch_margin: 0.25         # a new option must beat the current one by 25% after switching costs
+  out_of_range_hours: 24      # out of range this long -> re-centre or move
+  max_exit_probability: 0.5   # never pick a range the price will likely leave within a week
+

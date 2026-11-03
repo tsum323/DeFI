@@ -305,6 +305,19 @@ def research(engine) -> dict:
     }
 
 
+def _bot_brief(engine, cfg) -> dict:
+    from backend.lab.bot import summary
+    b = summary(engine, cfg)
+    cur = b["current"]
+    return {"balance_usd": b["balance_usd"], "pnl_usd": b["pnl_usd"], "start_usd": b["start_usd"],
+            "where": f"{cur['pair']} · {cur['network']}" if cur else "ждёт подходящего варианта"}
+
+
+def bot(engine, cfg) -> dict:
+    from backend.lab.bot import summary
+    return summary(engine, cfg)
+
+
 def activity(engine) -> dict:
     return {"items": recent_activity(engine, 300)}
 
@@ -341,6 +354,7 @@ def dashboard(engine, cfg) -> dict:
         "best": best,
         "portfolio": {k: pf[k] for k in ("initial_usd", "balance_usd", "pnl_usd", "pnl_pct", "fees_usd",
                                          "day_change_usd")} | {"open": len(pf["open"]), "closed": len(pf["closed"])},
+        "bot": _bot_brief(engine, cfg),
         "today": [{"at": a["at"], "status": a["status"], "message": a["message"]} for a in day[:12]],
         "next_tasks": (research(engine)["next_tasks"])[:5],
     }

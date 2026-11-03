@@ -203,6 +203,19 @@ def run_tick(engine, cfg, *, client, ds=None, study=None, version: str | None = 
     if s is not None:
         pf.snapshot_day(engine, s, now)
         out["portfolio"] = {k: s[k] for k in ("balance_usd", "pnl_usd")}
+    if res is not None:   # «Мой бот»: the user's virtual twin with its own small capital
+        from backend.lab import bot
+        with engine.connect() as c:
+            hrs = c.execute(select(S.pool_hours).where(S.pool_hours.c.hour_ts >= now - 40 * 86_400)
+                            .order_by(S.pool_hours.c.hour_ts)).all()
+        by_pool: dict = {}
+        for h in hrs:
+            by_pool.setdefault(h.pool, []).append(h)
+        bt = step(engine, "bot", bot.tick, engine, cfg, res, {p.key: p for p in pools}, by_pool, now)
+        bs = step(engine, "bot", bot.summary, engine, cfg, now)
+        if bs is not None:
+            bot.snapshot_day(engine, bs, now)
+            out["bot"] = {"action": (bt or {}).get("action"), "balance_usd": round(bs["balance_usd"], 2)}
     rv = step(engine, "learning", review_forecasts, engine, now)
     for le in (rv or {}).get("lessons", []):
         log_activity(engine, "learning", "info", f"Проверен прогноз {le['strategy']}: "

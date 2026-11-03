@@ -28,6 +28,8 @@ export function Dashboard() {
           hint={`проверенных ${d.counts.CONSERVATIVE} · умеренных ${d.counts.MODERATE} · экспериментальных ${d.counts.EXPERIMENTAL}`} />
         <Stat title="Виртуальный портфель" label="MODELED" value={usd(p.balance_usd, 2)} tone={sign(p.pnl_usd)}
           hint={`итог ${usd(p.pnl_usd, 2)} (${pct(p.pnl_pct, 2)}) · позиций ${p.open}`} />
+        {d.bot && <Stat title="Мой бот" value={usd(d.bot.balance_usd, 2)} tone={sign(d.bot.pnl_usd)}
+          hint={`начал с ${usd(d.bot.start_usd)} · ${d.bot.where}`} />}
         <Stat title="За сутки" label="MODELED" value={p.day_change_usd == null ? "—" : usd(p.day_change_usd, 2)} tone={sign(p.day_change_usd)}
           hint="изменение баланса портфеля" />
       </div>
@@ -329,5 +331,62 @@ export function Activity() {
         <button key={k} className={`pill${only === k ? " warn" : ""}`} onClick={() => setOnly(k)}>{t}</button>)}</div>
       <Card>{items.map((a) => <div className="log-item" key={a.id}><span className="muted">{date(a.at)}</span>
         <span><Pill tone={STATUS_TONE[a.status]}>{KIND_RU[a.kind] ?? a.kind}</Pill> {a.message}</span></div>)}</Card>
+    </>);
+}
+
+// ---------------------------------------------------------------- My bot
+export function Bot() {
+  const { data: d, error } = useApi<Any>("/api/lab/bot");
+  if (!d) return <Loading error={error} />;
+  const c = d.current, m = c?.mark ?? {}, e = c?.entry;
+  const NET: Record<string, string> = { ethereum: "Ethereum", base: "Base", arbitrum: "Arbitrum", optimism: "Optimism" };
+  return (
+    <>
+      <h1>Мой бот <Badge label="ESTIMATED" /></h1>
+      <p className="lead">Виртуальный двойник: начал с {usd(d.start_usd)} и сам выбирает, куда их поставить — так, как это сделали бы вы.
+        Одна позиция за раз, результат вкладывается обратно. Без реальных денег и транзакций.</p>
+      <div className="grid stats">
+        <Stat title="Начал с" value={usd(d.start_usd)} />
+        <Stat title="Сейчас" value={usd(d.balance_usd, 2)} tone={sign(d.pnl_usd)} hint={`${usd(d.pnl_usd, 2)} (${pct(d.pnl_pct, 2)})`} />
+        <Stat title="Позиций было" value={(d.closed.length + (c ? 1 : 0)).toString()} hint={`закрыто ${d.closed.length}`} />
+        <Stat title="Сейчас в" value={c ? `${NET[c.network] ?? c.network}` : "ждёт"} hint={c ? c.pair : ""} />
+      </div>
+      {d.history.length > 1 && <Card title="Баланс по дням"><Spark values={d.history.map((h: Any) => h.balance_usd)} /></Card>}
+      <Card title="Текущая позиция">
+        {!c ? <p className="muted">Позиции нет: бот ждёт подходящего варианта (см. журнал решений).</p> : <>
+          <div className="vpos-head"><b>{c.pair}</b> · {NET[c.network] ?? c.network} · диапазон ±{pctAbs(c.width, 0)}
+            <span className="vpos-tags">{m.in_range != null && <Pill tone={m.in_range ? "pos" : "neg"}>{m.in_range ? "в диапазоне" : "вне диапазона"}</Pill>}</span></div>
+          <div className="vpos-desc">{e.why}</div>
+          <div className="vpos-grid">
+            {([["Открыта", date(c.opened_at).replace(/\s\d{4}\sг\.,/, ",").replace(" МСК", "")],
+              ["Цена входа", num(e.price, e.price >= 1000 ? 0 : 2)],
+              ["Диапазон", `${num(e.range[0], e.range[0] >= 1000 ? 0 : 2)} – ${num(e.range[1], e.range[1] >= 1000 ? 0 : 2)}`],
+              ["Цена сейчас", m.price != null ? num(m.price, m.price >= 1000 ? 0 : 2) : "—"],
+              ["Вложено", usd(c.allocation_usd, 2)], ["Стоимость", m.value_usd != null ? usd(m.value_usd, 2) : "—"],
+              ["Комиссии", m.fees_usd != null ? usd(m.fees_usd, 2) : "—"], ["Потеря к хранению", m.il_usd != null ? usd(m.il_usd, 2) : "—"],
+              ["Расходы", m.costs_usd != null ? usd(m.costs_usd, 2) : "—"], ["К хранению", m.vs_hodl_usd != null ? usd(m.vs_hodl_usd, 2) : "—"],
+              ["Прогноз за неделю", `${usd(e.forecast.net_vs_hodl_usd[0], 2)} … ${usd(e.forecast.net_vs_hodl_usd[1], 2)}`],
+              ["Время в диапазоне", m.time_in_range != null ? pctAbs(m.time_in_range, 0) : "—"]] as [string, string][])
+              .map(([l, v]) => <div key={l}><span>{l}</span><b>{v}</b></div>)}
+          </div></>}
+      </Card>
+      <Card title="Журнал решений бота">
+        {d.decisions.length === 0 ? <p className="muted">Решений пока нет — бот начнёт со следующего обновления.</p> :
+          d.decisions.map((a: Any) => <div className="log-item" key={a.id}><span className="muted">{date(a.at)}</span><span>{a.message}</span></div>)}
+      </Card>
+      {d.closed.length > 0 && <Card title={`Закрытые позиции: ${d.closed.length}`}>
+        <ul>{d.closed.map((p: Any) => <li key={p.id}>{date(p.opened_at)} → {date(p.closed_at)} · {p.pair} ({NET[p.network] ?? p.network}) ±{pctAbs(p.width, 0)}:
+          <b className={sign(p.mark?.net_usd)}> {usd(p.mark?.net_usd, 2)}</b> — {p.close_reason}</li>)}</ul></Card>}
+      <Card title="Как бот принимает решения">
+        <ul>
+          <li>Выбирает вариант, который выгоден именно для его суммы: газ платится целиком при любой сумме, поэтому с небольшими деньгами выгоднее дешёвые сети.</li>
+          <li>Не берёт диапазон, из которого цена за неделю выйдет с шансом больше {pctAbs(d.rules.max_exit_probability, 0)}.</li>
+          <li>Если цена вне диапазона дольше {d.rules.out_of_range_hours} ч — закрывает и ставит новый диапазон (или переезжает).</li>
+          <li>Переезжает в другой вариант не раньше чем через {d.rules.min_hold_days} дн. и только если тот лучше на {pctAbs(d.rules.switch_margin, 0)} с учётом расходов на переезд.</li>
+          <li>Учится: если в какой-то сети комиссий выходит меньше прогноза, меньше доверяет прогнозам этой сети
+            {Object.keys(d.trust).length > 0 && <> (сейчас: {Object.entries(d.trust).map(([k, v]) => `${NET[k] ?? k} ${num(v as number, 2)}`).join(", ")})</>}.</li>
+        </ul>
+        <p className="muted">Расчёт по часовым данным пулов (ОЦЕНКА). Перевод денег между сетями (мост) в расчёте не учтён.</p>
+      </Card>
     </>);
 }

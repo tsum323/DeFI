@@ -4,7 +4,7 @@ import { DATA_UPDATED, STATIC, type SnapshotInfo } from "./api";
 import LivePrice from "./components/LivePrice";
 import { useApi } from "./components/useApi";
 import { date } from "./format";
-import { Activity, Dashboard, Portfolio, Research, Signals } from "./lab/pages";
+import { Activity, Bot, Dashboard, Portfolio, Research, Signals } from "./lab/pages";
 
 function SnapshotBanner() {
   const { data } = useApi<SnapshotInfo>("/api/snapshot");
@@ -18,8 +18,8 @@ function SnapshotBanner() {
     обновлено {date(data.exported_at)} · {data.live ? `автоматически каждые ${data.every_minutes ?? 15} минут` : "снимок"}.</div>;
 }
 
-const NAV = [["/", "Главная"], ["/signals", "Сигналы"], ["/portfolio", "Портфель"], ["/research", "Исследования"],
-  ["/activity", "Журнал"]] as const;
+const NAV = [["/", "Главная"], ["/signals", "Сигналы"], ["/bot", "Мой бот"], ["/portfolio", "Портфель"],
+  ["/research", "Исследования"], ["/activity", "Журнал"]] as const;
 
 export default function App() {
   return (
@@ -41,6 +41,7 @@ export default function App() {
         <Routes>
           <Route path="/" element={<Dashboard />} />
           <Route path="/signals" element={<Signals />} />
+          <Route path="/bot" element={<Bot />} />
           <Route path="/portfolio" element={<Portfolio />} />
           <Route path="/research" element={<Research />} />
           <Route path="/activity" element={<Activity />} />
