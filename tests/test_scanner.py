@@ -8,8 +8,17 @@ from types import SimpleNamespace
 from backend.backtesting import uniswap_math as um
 from backend.data_engine.abi import encode_word
 from backend.database import schema as S
-from backend.lab.scanner import (SWAP_TOPIC, ScanPool, aggregate_logs, base_price, exit_probability,
-                                 il_at, ingest, position, range_fees)
+from backend.lab.scanner import (
+    SWAP_TOPIC,
+    ScanPool,
+    aggregate_logs,
+    base_price,
+    exit_probability,
+    il_at,
+    ingest,
+    position,
+    range_fees,
+)
 
 WBTC_USDC = ScanPool("wbtc_usdc_3000", "0x99ac8cA7087fA4A2A1FB6357269965A2014ABc35", "WBTC", "USDC", 8, 6, 3000, "WBTC")
 USDC_WETH = ScanPool("weth_usdc_500", "0x88e6A0c2dDD26FEEb64F039a2c41296FcB3f5640", "USDC", "WETH", 6, 18, 500, "WETH")

@@ -1,0 +1,144 @@
+{
+ "day": "2026-11-03",
+ "created_at": 1793709138,
+ "done": [
+  {
+   "at": 1793709138,
+   "kind": "research",
+   "status": "ok",
+   "message": "Исследование дня: предложено гипотез 2, проверено 2, подтверждено 2"
+  },
+  {
+   "at": 1793709138,
+   "kind": "calibration",
+   "status": "ok",
+   "message": "Калибровка сканера: множитель комиссий 0.84 (часовая оценка против точной модели WBTC/USDC 0,3%)"
+  },
+  {
+   "at": 1793709138,
+   "kind": "portfolio",
+   "status": "info",
+   "message": "Открыта виртуальная позиция: EXPERIMENTAL: WETH/USDC 0.30% ±10% на $500"
+  },
+  {
+   "at": 1793709138,
+   "kind": "portfolio",
+   "status": "info",
+   "message": "Открыта виртуальная позиция: EXPERIMENTAL: WETH/USDC 0.05% ±10% на $500"
+  },
+  {
+   "at": 1793709138,
+   "kind": "portfolio",
+   "status": "info",
+   "message": "Открыта виртуальная позиция: EXPERIMENTAL: WBTC/USDC w0.3_r1=0.8_exit_d7200_cool72h на $500"
+  },
+  {
+   "at": 1793709138,
+   "kind": "portfolio",
+   "status": "info",
+   "message": "Открыта виртуальная позиция: MODERATE: WBTC/USDC w0.2_r1=0.7_static на $1,500"
+  },
+  {
+   "at": 1793709138,
+   "kind": "scan",
+   "status": "ok",
+   "message": "Просканировано пулов: 8; с положительной оценкой: 8; лучший WETH/USDC 0.05%"
+  },
+  {
+   "at": 1793709138,
+   "kind": "data",
+   "status": "ok",
+   "message": "Загружено 205 обменов по 8 пулам (блоки 26334247–26334288)"
+  },
+  {
+   "at": 1793708983,
+   "kind": "scan",
+   "status": "ok",
+   "message": "Просканировано 8 пулов; положительный ожидаемый результат у 8"
+  },
+  {
+   "at": 1793708965,
+   "kind": "scan",
+   "status": "ok",
+   "message": "Просканировано 8 пулов; положительный ожидаемый результат у 8"
+  },
+  {
+   "at": 1793708943,
+   "kind": "scan",
+   "status": "ok",
+   "message": "Просканировано 8 пулов; положительный ожидаемый результат у 8"
+  },
+  {
+   "at": 1793708891,
+   "kind": "scan",
+   "status": "ok",
+   "message": "Просканировано 8 пулов; положительный ожидаемый результат у 2"
+  },
+  {
+   "at": 1793708885,
+   "kind": "data",
+   "status": "ok",
+   "message": "Сканер: загружено 948972 обменов по 8 пулам"
+  }
+ ],
+ "errors": [],
+ "opportunities": {
+  "CONSERVATIVE": [],
+  "MODERATE": [
+   "w0.2_r1=0.7_static",
+   "w0.3_r1=0.7_exit_d300",
+   "w0.5_r1=0.7_exit_d300",
+   "w1_r1=0.7_exit_d300",
+   "w0.15_r1=0.7_static"
+  ],
+  "EXPERIMENTAL": [
+   "w0.3_r1=0.8_exit_d7200_cool72h",
+   "w0.2_r1=0.8_exit_d7200_cool72h",
+   "w0.2_r1=0.8_static_volw4",
+   "w0.4_r1=0.9_static",
+   "w0.3_r1=0.9_static",
+   "w0.25_r1=0.9_static"
+  ]
+ },
+ "top_pools": [
+  {
+   "pair": "WETH/USDC",
+   "fee_tier": 0.0005,
+   "width": 0.1,
+   "net_mid_usd": 141.9552849308931
+  },
+  {
+   "pair": "WBTC/USDC",
+   "fee_tier": 0.003,
+   "width": 0.1,
+   "net_mid_usd": 127.23705479040342
+  },
+  {
+   "pair": "WETH/USDC",
+   "fee_tier": 0.003,
+   "width": 0.1,
+   "net_mid_usd": 116.73507536158363
+  }
+ ],
+ "portfolio": {
+  "balance_usd": 9995.718500141515,
+  "pnl_usd": -4.28149985848529,
+  "fees_usd": 0.051521085252308654,
+  "il_usd": 0.0,
+  "costs_usd": 4.333020943737545,
+  "day_change_usd": null
+ },
+ "lessons": [],
+ "fee_calibration": {
+  "factor": null,
+  "reviews": 0,
+  "note": "нужно минимум 3 завершённых проверки прогноза"
+ },
+ "hypotheses_total": 7,
+ "research": {
+  "proposed": 2,
+  "tested": 2,
+  "confirmed": 2
+ },
+ "next_tasks": []
+}

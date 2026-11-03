@@ -49,8 +49,9 @@ def main() -> None:
         for name in ("static_wide_50",):
             fid = add_forward_test(engine, BASE_STRATEGIES[name], last, capital, "base strategy (control)")
             print(f"registered #{fid} {BASE_STRATEGIES[name].name} from block {last} (control)")
+    from backend.lab.portfolio import closed_forward_tests
     res = mark_forward_tests(engine, ds, lambda b: cached_state_at(ds, b), last,
-                             cfg.lab["costs"]["priority_fee_gwei"])
+                             cfg.lab["costs"]["priority_fee_gwei"], skip_ids=closed_forward_tests(engine))
     usd = 10 ** ds.decimals1
     if not res:
         print("no forward test has new data yet (they start at the current block)")

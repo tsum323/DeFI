@@ -1,11 +1,12 @@
-# CLAUDE.md — правила работы над DeFi Liquidity Lab
+# CLAUDE.md — правила работы над UNISWAP AI LAB (бывш. DeFi Liquidity Lab)
 
 Читать в начале КАЖДОЙ сессии, до любых действий.
 
 ## Обязательно прочитать
 1. `docs/SPEC.md` — полное ТЗ заказчика (источник требований, не сокращать и не менять).
 2. `ROADMAP.md` — текущий этап и статус.
-3. `docs/ARCHITECTURE.md`, `docs/MATH_CORE.md`, `docs/DATA_SOURCES.md`, `docs/RISKS.md` — принятые решения.
+3. `docs/LAB.md` (новая архитектура), `docs/AUDIT.md`, `docs/ARCHITECTURE.md`, `docs/MATH_CORE.md`,
+   `docs/DATA_SOURCES.md`, `docs/RISKS.md` — принятые решения.
 
 ## Язык
 Общение с заказчиком и документация — на русском. Код и комментарии — на английском.
@@ -39,3 +40,5 @@
   и `python -m scripts.forward_test` (или весь цикл: `python -m scripts.scheduler once`). В конце сессии: `python -m scripts.data_snapshot export-research`
   и коммит `data_snapshots/research_db/`. Лимит Alchemy ограничен — для загрузки использовать dRPC.
 - Ключ Claude API для AI Researcher (этап 7): `ANTHROPIC_API_KEY` (может быть ещё не задан).
+- Распорядок UNISWAP AI LAB: `python -m scripts.lab_cycle` (сканер, портфель, обучение; раз в день —
+  исследование и отчёт). Проверка резервной копии: `python -m scripts.verify_backup`.

@@ -1,0 +1,219 @@
+"""Read-only API of UNISWAP AI LAB: the five sections of the interface.
+
+Every number carries its origin: EXACT (blockchain), MODELED (exact pool replay /
+backtest), ESTIMATED (hourly approximation), SCENARIO (forecast). Nothing here writes.
+"""
+
+from __future__ import annotations
+
+import json
+import time
+
+from sqlalchemy import func, select
+
+from backend.database import schema as S
+from backend.lab.activity import recent_activity
+from backend.lab.cycle import latest_ranking, latest_scan
+
+RISK_TEXT = {
+    "general": ("Предоставление ликвидности может привести к частичной или полной потере вложенных средств. "
+                "Риски: движение цены (потеря относительно хранения токенов), ошибки смарт-контрактов, "
+                "отвязка токенов (USDC, WBTC), низкая ликвидность, ошибки модели. Расчёты — оценки модели, "
+                "не гарантия дохода и не инвестиционная рекомендация. Система ничего не исполняет: решение "
+                "и транзакцию делаете только вы."),
+}
+TIER_SHARE = {"CONSERVATIVE": 0.30, "MODERATE": 0.15, "EXPERIMENTAL": 0.05}
+
+
+def _strict(engine) -> dict:
+    with engine.connect() as c:
+        sig = c.execute(select(S.signals).order_by(S.signals.c.id.desc()).limit(1)).first()
+        ev = c.execute(select(S.signal_events).where(S.signal_events.c.signal_id == sig.id)
+                       .order_by(S.signal_events.c.id.desc()).limit(1)).first() if sig else None
+    if sig is None:
+        return {"status": "WAIT", "text": "Сигналов ещё не было."}
+    p = json.loads(sig.payload_json)
+    status = ev.status if ev else sig.signal_type
+    return {"status": status, "type": sig.signal_type, "id": sig.id, "created_at": sig.created_at,
+            "payload": p if sig.signal_type == "OPEN CANDIDATE" else None,
+            "text": ("Строгий сигнал на открытие есть — см. карточку." if sig.signal_type == "OPEN CANDIDATE"
+                     and status in ("OPEN CANDIDATE", "HOLD", "REBALANCE") else
+                     "Строгого сигнала нет: ни одна стратегия не прошла все проверки. Ниже — лучшие текущие "
+                     "варианты с честной оценкой, насколько они проверены.")}
+
+
+def _exact_card(o: dict) -> dict:
+    """Opportunity (exact replay of WBTC/USDC 0.3%) in the common card shape."""
+    rng, a = o["range"], o["allocation"]
+    h = o["historical"]
+    return {
+        "id": "x-" + o["spec_hash"][:12], "source": "exact", "tier": o["tier"], "pair": o["pair"],
+        "network": o["network"], "pool": o["pool"], "pool_address": o["pool_address"], "fee_tier": o["fee_tier"],
+        "price": o["current_price"], "price_lower": rng["price_lower"], "price_upper": rng["price_upper"],
+        "deposit_usd": a["deposit_usd"], "token0_amount": a["token0"], "token1_amount": a["token1"],
+        "quote_share": a.get("usdc_value_share"), "base": "WBTC", "quote": "USDC", "token0": "WBTC", "token1": "USDC",
+        "strategy": o["strategy"], "rule": o["rebalance_rule"], "horizon_days": o["horizon_days"],
+        "fees_usd": o["expected_fees_usd"], "il_usd": o["expected_il_usd"],
+        "scenarios": [{"change": s["price_change"], "il_usd": s["il_usd"],
+                       "position_change_usd": s["net_usd"][0] + o["costs_usd"]["gas_open"] + o["costs_usd"]["gas_close"]
+                       - o["expected_fees_usd"][0]}
+                      for s in o.get("il_scenarios", []) if s["price_change"] in (-0.2, -0.1, 0.1, 0.2)],
+        "gas_usd": o["costs_usd"]["gas_open"] + o["costs_usd"]["gas_close"], "swap_usd": o["costs_usd"]["swap"],
+        "net_usd": o["expected_net_vs_hodl_usd"], "exit_probability": o["exit_probability"],
+        "risk": o["risk"], "risk_why": o["risk_why"], "confidence": o["confidence"],
+        "history": {"robustness": h.get("robustness_score"), "oos_vs_passive": h.get("oos_mean_excess_vs_passive"),
+                    "oos_positive": h.get("oos_positive_segments"), "oos_roi": h.get("oos_mean_roi"),
+                    "is_vs_passive": h.get("is_mean_excess"), "mean_drawdown": h.get("mean_drawdown"),
+                    "max_drawdown": h.get("max_drawdown"), "segments": "21 отрезок по 91 дню, 2021–2026"},
+        "why": o["reasons"], "blockers": o["blockers_ru"], "to_improve": o["to_improve_ru"],
+        "invalidation": ["цена выйдет за диапазон" + (" (стратегия переставляет диапазон)" if o["rebalance_rule"] != "none" else ""),
+                         "стратегия выпадет из рейтинга возможностей", "волатильность вырастет в 1,5 раза"],
+        "valid_until": o["valid_until"], "label": "MODELED", "oos_contaminated": o["oos_contaminated"],
+        "variants": [v["strategy"] for v in o.get("variants", [])],
+    }
+
+
+def _scan_card(p: dict, scan: dict) -> dict | None:
+    b = p.get("best")
+    if not b:
+        return None
+    base, quote = p["pair"].split("/")
+    why = []
+    v24 = p["volume_usd"]["24h"]
+    if v24 >= 100_000:
+        why.append(f"активные торги: ${v24:,.0f} за сутки, комиссий ${p['fees_usd']['24h']:,.0f}")
+    if p["tvl_usd"] >= 1_000_000:
+        why.append(f"в пуле достаточно ликвидности: ${p['tvl_usd']:,.0f}")
+    why.append(f"за последние дни такой диапазон зарабатывал бы ${b['fees_usd'][0]:,.0f}–${b['fees_usd'][1]:,.0f} "
+               f"комиссий за {scan['horizon_days']} дн. на ${scan['capital_usd']:,.0f}")
+    p_exit = b["exit_probability"]
+    risk = "high" if p_exit > 0.4 or (p["volatility_7d"] or 0) > 0.8 else "medium" if p_exit > 0.15 else "low"
+    return {
+        "id": f"s-{p['pool']}", "source": "estimated", "tier": "EXPERIMENTAL", "pair": p["pair"], "network": "ethereum",
+        "pool": p["pool"], "pool_address": p["address"], "fee_tier": p["fee_tier"], "price": p["price"],
+        "price_lower": b["price_lower"], "price_upper": b["price_upper"], "deposit_usd": scan["capital_usd"],
+        "token0_amount": b["amount0"], "token1_amount": b["amount1"], "quote_share": b["share_quote_value"],
+        "base": base, "quote": quote, "token0": p.get("token0", base), "token1": p.get("token1", quote),
+        "strategy": f"диапазон ±{b['width']:.0%} без перестановок", "rule": "none",
+        "horizon_days": scan["horizon_days"], "fees_usd": b["fees_usd"], "il_usd": b["il_usd"],
+        "scenarios": b.get("scenarios", []),
+        "gas_usd": b["gas_usd"], "swap_usd": b["swap_usd"], "net_usd": b["net_vs_hodl_usd"],
+        "exit_probability": p_exit, "risk": risk,
+        "risk_why": f"шанс выхода из диапазона за {scan['horizon_days']} дн. ~{p_exit:.0%}; волатильность "
+                    f"{(p['volatility_7d'] or 0):.0%} годовых",
+        "confidence": "low",
+        "history": {"days": p["history_days"], "segments": f"только последние {p['history_days']:.0f} дн. (нет проверки на истории)"},
+        "why": why, "blockers": ["нет проверки на многолетней истории и на «невиденных» данных"] + p["problems"] + p["data_quality"],
+        "to_improve": ["накопить результат в виртуальном портфеле", "загрузить длинную историю пула для полной проверки"],
+        "invalidation": ["цена выйдет за диапазон", "объём торгов упадёт ниже $100 000 за сутки",
+                         "волатильность вырастет в 1,5 раза"],
+        "valid_until": scan["created_at"] + scan["horizon_days"] * 86_400, "label": "ESTIMATED",
+        "token_risks": p["token_risks"], "fee_calibration": (scan.get("fee_calibration") or {}).get("factor"),
+        "variants": [],
+    }
+
+
+def signals(engine) -> dict:
+    ranking = latest_ranking(engine) or {}
+    scan = latest_scan(engine) or {}
+    cards = [_exact_card(o) for t in ("CONSERVATIVE", "MODERATE", "EXPERIMENTAL") for o in ranking.get("tiers", {}).get(t, [])]
+    for p in scan.get("pools", []):
+        if p["pool"] == ranking.get("pool"):
+            continue
+        c = _scan_card(p, scan)
+        if c and p.get("score") is not None and c["net_usd"][1] > 0:
+            cards.append(c)
+    bad = [{"pair": p["pair"], "fee_tier": p["fee_tier"], "problems": p["problems"] + p["data_quality"]}
+           for p in scan.get("pools", []) if p["problems"] or p["data_quality"]]
+    return {"strict": _strict(engine), "cards": cards, "tier_share": TIER_SHARE,
+            "market": ranking.get("market"), "market_checks": ranking.get("market_checks", []),
+            "diagnostics": ranking.get("diagnostics", []), "pools_with_problems": bad,
+            "scan_at": scan.get("created_at"), "ranking_at": ranking.get("created_at"),
+            "risk_warning": RISK_TEXT["general"]}
+
+
+def portfolio(engine, cfg) -> dict:
+    from backend.lab.portfolio import summary
+    return summary(engine, cfg)
+
+
+def research(engine) -> dict:
+    from backend.lab.learning import REASON_RU, fee_calibration
+    from backend.lab.scanner import get_state
+    with engine.connect() as c:
+        hyps = c.execute(select(S.hypotheses).order_by(S.hypotheses.c.id.desc()).limit(40)).all()
+        lessons = c.execute(select(S.lessons).order_by(S.lessons.c.id.desc()).limit(30)).all()
+        fcs = c.execute(select(S.forecasts).order_by(S.forecasts.c.id.desc()).limit(40)).all()
+        n_exp = c.execute(select(func.count()).select_from(S.experiments).where(S.experiments.c.status == "done")).scalar()
+        n_str = c.execute(select(func.count()).select_from(S.strategies)).scalar()
+    out_h = []
+    for h in hyps:
+        r = json.loads(h.result_json) if h.result_json else {}
+        out_h.append({"id": h.id, "created_at": h.created_at, "title": h.title, "description": h.description,
+                      "rationale": h.rationale, "status": h.status, "verdict": h.verdict, "confidence": h.confidence,
+                      "conclusion": h.conclusion, "by": h.created_by_model,
+                      "strategies": [{"strategy": s.get("strategy"), "verdict": s.get("verdict"),
+                                      "oos_vs_passive": s.get("mean_excess"), "positive": s.get("positive_excess_segments")}
+                                     for s in r.get("strategies", [])],
+                      "oos_contaminated": r.get("oos_contaminated")})
+    return {
+        "foundation": {"experiments": n_exp, "strategies": n_str, "period": "2021-08-06 … 2026-11-01",
+                       "pool": "WBTC/USDC 0,3% (полная история с мая 2021)",
+                       "note": "историческое исследование сохранено и не пересчитывается; новые стратегии считаются только для себя"},
+        "hypotheses": out_h,
+        "confirmed": [h for h in out_h if h["verdict"] == "confirmed"],
+        "rejected": [h for h in out_h if h["verdict"] == "rejected"],
+        "lessons": [{"at": le.created_at, "strategy": le.strategy,
+                     "reasons": [REASON_RU.get(r, r) for r in json.loads(le.reasons_json)], "action": le.action}
+                    for le in lessons],
+        "forecasts": [{"id": f.id, "created_at": f.created_at, "strategy": f.strategy, "tier": f.tier,
+                       "status": f.status, "forecast": json.loads(f.forecast_json),
+                       "checkpoint": json.loads(f.checkpoint_json) if f.checkpoint_json else None,
+                       "review": json.loads(f.review_json) if f.review_json else None,
+                       "due": f.created_at + f.horizon_days * 86_400} for f in fcs],
+        "fee_calibration_forecasts": fee_calibration(engine),
+        "scanner_calibration": get_state(engine, "scanner_fee_calibration"),
+        "next_tasks": (get_state(engine, "next_tasks") or {}).get("items", []),
+        "reason_names": REASON_RU,
+    }
+
+
+def activity(engine) -> dict:
+    return {"items": recent_activity(engine, 300)}
+
+
+def dashboard(engine, cfg) -> dict:
+    from backend.lab.portfolio import summary
+    sig = signals(engine)
+    acts = recent_activity(engine, 300)
+    now = int(time.time())
+    day = [a for a in acts if a["at"] >= now - 86_400]
+    errors = [a for a in day if a["status"] == "error"]
+    last = acts[0]["at"] if acts else None
+    pf = summary(engine, cfg)
+    with engine.connect() as c:
+        ss = c.execute(select(S.sync_state)).first()
+        sc = c.execute(select(S.scan_state)).first()
+    ordered = sorted(sig["cards"], key=lambda c: ({"CONSERVATIVE": 0, "MODERATE": 1, "EXPERIMENTAL": 2}[c["tier"]],
+                                                  -(c["net_usd"][0] + c["net_usd"][1]) / 2))
+    best, seen = [], set()
+    for c in ordered:   # the best variant of each pair / source
+        key = (c["pair"], c["source"])
+        if key not in seen:
+            seen.add(key)
+            best.append(c)
+    best = best[:4]
+    stale = last is None or now - last > 3 * 3600
+    return {
+        "status": "error" if errors and len(errors) >= 3 else "stale" if stale else "ok",
+        "status_text": ("Система работает: последнее действие " if not stale else "Давно не было действий: ") ,
+        "last_action_at": last, "errors_24h": [e["message"] for e in errors][:5],
+        "data": {"pool_block": ss.last_block if ss else None, "scanner_block": sc.last_block if sc else None},
+        "strict": sig["strict"], "counts": {t: sum(1 for c in sig["cards"] if c["tier"] == t)
+                                             for t in ("CONSERVATIVE", "MODERATE", "EXPERIMENTAL")},
+        "best": best,
+        "portfolio": {k: pf[k] for k in ("initial_usd", "balance_usd", "pnl_usd", "pnl_pct", "fees_usd",
+                                         "day_change_usd")} | {"open": len(pf["open"]), "closed": len(pf["closed"])},
+        "today": [{"at": a["at"], "status": a["status"], "message": a["message"]} for a in day[:12]],
+        "next_tasks": (research(engine)["next_tasks"])[:5],
+    }

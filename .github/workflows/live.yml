@@ -22,7 +22,7 @@ concurrency:
 jobs:
   update:
     runs-on: ubuntu-latest
-    timeout-minutes: 40
+    timeout-minutes: 75   # daily research (~10 min) + sync + the 15-minute wait before the next run
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}

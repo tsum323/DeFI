@@ -11,6 +11,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
+from backend.api import lab as L
 from backend.api import queries as Q
 from backend.core.config import load_config
 from backend.database import schema as S
@@ -47,6 +48,31 @@ def research():
 @app.get("/api/signals")
 def signals():
     return Q.signals(engine)
+
+
+@app.get("/api/lab/dashboard")
+def lab_dashboard():
+    return L.dashboard(engine, cfg)
+
+
+@app.get("/api/lab/signals")
+def lab_signals():
+    return L.signals(engine)
+
+
+@app.get("/api/lab/portfolio")
+def lab_portfolio():
+    return L.portfolio(engine, cfg)
+
+
+@app.get("/api/lab/research")
+def lab_research():
+    return L.research(engine)
+
+
+@app.get("/api/lab/activity")
+def lab_activity():
+    return L.activity(engine)
 
 
 @app.get("/api/opportunities")

@@ -35,15 +35,15 @@ WHY_RU = {
     "data_current": "данные пула не свежие",
     "pool_activity": "недостаточный объём торгов в пуле",
     "market_data_complete": "не хватает рыночных данных (волатильность, газ, ETH/USD)",
-    "sufficient_history": "недостаточная историческая выборка (нет результатов на всех отрезках)",
-    "oos_beats_passive": "неудачные результаты out-of-sample: не лучше пассивного размещения",
-    "oos_positive_roi": "отрицательная доходность на out-of-sample отрезках",
-    "stable_across_periods": "нестабильна: на отрезках подбора проигрывала пассивному варианту",
+    "sufficient_history": "мало истории: нет результатов на всех периодах",
+    "oos_beats_passive": "на данных, которые стратегия не видела, не лучше простого размещения",
+    "oos_positive_roi": "на данных, которые стратегия не видела, в минусе",
+    "stable_across_periods": "нестабильна: в периодах, на которых её подбирали, проигрывала простому размещению",
     "acceptable_drawdown": "слишком глубокие исторические просадки",
     "costs_included_robust": "не выдерживает рост газа ×2 или разорялась",
     "fits_current_regime": "в похожем рынке исторически не зарабатывала",
-    "oos_contaminated": "параметры выбраны после просмотра out-of-sample — нужна проверка на новых данных",
-    "negative_net": "отрицательный ожидаемый результат против HODL после расходов",
+    "oos_contaminated": "параметры придуманы после просмотра проверочных данных — нужна проверка на новых данных",
+    "negative_net": "после расходов ожидается хуже, чем просто хранить токены",
     "gas_heavy": "газ съедает больше четверти ожидаемых комиссий",
     "exit_risk": "высокий риск выхода цены из диапазона за горизонт",
     "high_volatility": "высокая волатильность рынка сейчас",
@@ -133,14 +133,14 @@ def opportunity(ds, state, snap: MarketSnapshot, cand: Candidate, tier: str, blo
         score = round(robustness * 100 * (1 - (p_exit or 0) * 0.5) * (1 if mid > 0 else 0.5), 1)
     reasons = []
     st = cand.stats
-    reasons.append(f"на out-of-sample лучше пассивного LP в {st['positive_excess_segments']} из 7 "
-                   f"отрезков, в среднем {st['mean_excess'] * 100:+.1f}% за 91 день")
+    reasons.append(f"на данных, которые стратегия раньше не видела, была лучше простого размещения в "
+                   f"{st['positive_excess_segments']} из 7 периодов по 3 месяца, в среднем на {st['mean_excess'] * 100:+.1f}%")
     if (st.get("oos_mean_roi") or 0) > 0:
-        reasons.append(f"средняя доходность на OOS {st['oos_mean_roi'] * 100:+.1f}% за отрезок")
+        reasons.append(f"на этих данных в среднем зарабатывала {st['oos_mean_roi'] * 100:+.1f}% за 3 месяца")
     if "fits_current_regime" not in blockers and st.get("regime_segments"):
-        reasons.append(f"зарабатывала в похожем рынке ({st['regime_segments']} отрезков)")
+        reasons.append(f"зарабатывала при похожем рынке ({st['regime_segments']} периода)")
     if fees[0] > 0:
-        reasons.append(f"комиссии на этом диапазоне за последние дни: ${fees[0]:,.0f}–${fees[1]:,.0f} "
+        reasons.append(f"за последние дни такой диапазон собрал бы ${fees[0]:,.0f}–${fees[1]:,.0f} комиссий "
                        f"за {p['horizon_days']} дн.")
     return {
         "tier": tier, "strategy": cand.params.name, "spec_hash": cand.params.spec_hash,

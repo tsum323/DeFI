@@ -1,11 +1,12 @@
 import type { ReactNode } from "react";
 import type { Label } from "../api";
 
-const LABEL_RU: Record<Label, string> = { EXACT: "ТОЧНО", MODELED: "МОДЕЛЬ", SCENARIO: "ПРОГНОЗ" };
+const LABEL_RU: Record<Label, string> = { EXACT: "ТОЧНО", MODELED: "МОДЕЛЬ", SCENARIO: "ПРОГНОЗ", ESTIMATED: "ОЦЕНКА" };
 const LABEL_HINT: Record<Label, string> = {
   EXACT: "восстановлено из событий блокчейна и сверено с контрактом",
   MODELED: "модельная оценка: бэктест или гипотетическая позиция",
   SCENARIO: "сценарный прогноз, не гарантия",
+  ESTIMATED: "приближённая оценка по часовым данным (не точная модель пула)",
 };
 
 export function Badge({ label }: { label: Label }) {

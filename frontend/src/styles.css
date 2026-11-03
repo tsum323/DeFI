@@ -73,3 +73,19 @@ ul { margin: 6px 0; padding-left: 18px; } li { margin: 3px 0; }
 .snapshot { border: 1px solid rgba(122,162,247,.35); background: rgba(122,162,247,.08); color: #c9d6fb;
   padding: 8px 12px; border-radius: 10px; margin-bottom: 16px; font-size: 13px; }
 button.pill { cursor: pointer; font: inherit; font-size: 12px; }
+
+/* UNISWAP AI LAB */
+.badge-estimated { color: #c4a7ff; border-color: rgba(196,167,255,.45); background: rgba(196,167,255,.08); }
+.dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 6px; background: var(--muted); }
+.dot.ok { background: var(--pos); } .dot.warn, .dot.stale { background: var(--warn); } .dot.error { background: var(--neg); }
+details { margin-top: 8px; } details > summary { cursor: pointer; color: var(--gold2); font-size: 13px; }
+details[open] > summary { margin-bottom: 6px; }
+.big { font-size: 22px; font-weight: 700; } .hero { font-size: 15px; line-height: 1.55; }
+.kv { display: grid; grid-template-columns: max-content 1fr; gap: 4px 14px; font-size: 13px; }
+.kv > span:nth-child(odd) { color: var(--muted); }
+.warnbox { border: 1px solid rgba(251,191,36,.35); background: rgba(251,191,36,.06); border-radius: 10px; padding: 10px 12px; font-size: 12.5px; color: #e9d9a6; }
+.capital { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.capital input { background: var(--panel); border: 1px solid var(--line); color: var(--text); border-radius: 8px; padding: 6px 10px; width: 140px; font: inherit; }
+.tabs { display: flex; gap: 6px; flex-wrap: wrap; margin: 4px 0 12px; }
+.log-item { display: grid; grid-template-columns: 112px 1fr; gap: 8px; padding: 6px 0; border-bottom: 1px solid var(--line); font-size: 13px; }
+@media (max-width: 640px) { .log-item { grid-template-columns: 1fr; } .kv { grid-template-columns: 1fr; } }

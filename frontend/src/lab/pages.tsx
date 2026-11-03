@@ -1,0 +1,213 @@
+// The five sections of UNISWAP AI LAB.
+import { useState } from "react";
+import { Badge, Card, Loading, Pill, Stat } from "../components/ui";
+import { useApi } from "../components/useApi";
+import { date, num, pct, pctAbs, sign, usd } from "../format";
+import { type CardT, CONF_RU, RISK_RU, SignalCard, Spark, STATUS_RU, TIER_RU } from "./common";
+
+type Any = Record<string, any>;
+const STATUS_TONE: Record<string, string> = { ok: "pos", warn: "warn", error: "neg", info: "" };
+const KIND_RU: Record<string, string> = { data: "данные", scan: "сканер", portfolio: "портфель", learning: "обучение",
+  calibration: "калибровка", research: "исследование", report: "отчёт" };
+
+function readCapital(): number | null {
+  try { const v = Number(localStorage.getItem("real_capital")); return v > 0 ? v : null; } catch { return null; }
+}
+
+// ---------------------------------------------------------------- Dashboard
+export function Dashboard() {
+  const { data: d, error } = useApi<Any>("/api/lab/dashboard");
+  if (!d) return <Loading error={error} />;
+  const p = d.portfolio;
+  return (
+    <>
+      <h1>UNISWAP AI LAB</h1>
+      <p className="lead"><span className={`dot ${d.status}`} />
+        {d.status === "ok" ? "Система работает" : d.status === "stale" ? "Давно нет новых действий" : "Есть ошибки"} ·
+        последнее действие {date(d.last_action_at)}. Только чтение блокчейна — система ничего не покупает и не подписывает.</p>
+      <div className="grid stats">
+        <Stat title="Строгий сигнал" value={STATUS_RU[d.strict.status] ?? d.strict.status} hint={d.strict.status === "WAIT" ? "все проверки пройдены не были" : ""} />
+        <Stat title="Возможностей сейчас" value={d.counts.CONSERVATIVE + d.counts.MODERATE + d.counts.EXPERIMENTAL}
+          hint={`проверенных ${d.counts.CONSERVATIVE} · умеренных ${d.counts.MODERATE} · экспериментальных ${d.counts.EXPERIMENTAL}`} />
+        <Stat title="Виртуальный портфель" label="MODELED" value={usd(p.balance_usd, 2)} tone={sign(p.pnl_usd)}
+          hint={`итог ${usd(p.pnl_usd, 2)} (${pct(p.pnl_pct, 2)}) · позиций ${p.open}`} />
+        <Stat title="За сутки" label="MODELED" value={p.day_change_usd == null ? "—" : usd(p.day_change_usd, 2)} tone={sign(p.day_change_usd)}
+          hint="изменение баланса портфеля" />
+      </div>
+      {d.errors_24h.length > 0 && <Card title="Ошибки за сутки"><ul>{d.errors_24h.map((e: string) => <li key={e} className="neg">{e}</li>)}</ul></Card>}
+      <Card title="Лучшие варианты сейчас" right={<Badge label="SCENARIO" />}>
+        {d.best.length === 0 ? <p className="muted">Интересных вариантов сейчас нет — система продолжает исследование.</p> :
+          <ul>{d.best.map((c: CardT) => <li key={c.id}><b>{c.pair}</b> {pctAbs(c.fee_tier, 2)} · {TIER_RU[c.tier].name.toLowerCase()} ·
+            диапазон {num(c.price_lower, 0)}–{num(c.price_upper, 0)} · за {c.horizon_days} дн. на {usd(c.deposit_usd)}: <span className={sign(c.net_usd[0] + c.net_usd[1])}>{usd(c.net_usd[0])} … {usd(c.net_usd[1])}</span> к хранению · риск {RISK_RU[c.risk]}
+            {c.label === "ESTIMATED" && <> <Badge label="ESTIMATED" /></>}</li>)}</ul>}
+        <p className="muted">Подробно — в разделе «Сигналы».</p>
+      </Card>
+      <Card title="Что система делала сегодня">
+        {d.today.length === 0 ? <p className="muted">Сегодня ещё не было действий.</p> :
+          d.today.map((a: Any, i: number) => <div className="log-item" key={i}><span className="muted">{date(a.at).replace(/^.*?г\.,?\s*/, "")}</span>
+            <span><Pill tone={STATUS_TONE[a.status]}>{a.status}</Pill> {a.message}</span></div>)}
+      </Card>
+      <Card title="Что исследует дальше">
+        {d.next_tasks.length === 0 ? <p className="muted">Новые задачи появятся после ежедневного исследования (около 03:00 МСК).</p> :
+          <ul>{d.next_tasks.map((t: Any) => <li key={t.title}>{t.title}</li>)}</ul>}
+      </Card>
+    </>);
+}
+
+// ---------------------------------------------------------------- Signals
+export function Signals() {
+  const { data: d, error } = useApi<Any>("/api/lab/signals");
+  const [capital, setCapital] = useState<number | null>(readCapital());
+  const [tier, setTier] = useState<string>("all");
+  const [sort, setSort] = useState<string>("tier");
+  if (!d) return <Loading error={error} />;
+  const save = (v: string) => { const n = Number(v.replace(/\s/g, "")); setCapital(n > 0 ? n : null);
+    try { n > 0 ? localStorage.setItem("real_capital", String(n)) : localStorage.removeItem("real_capital"); } catch { /* private mode */ } };
+  const order: Record<string, number> = { CONSERVATIVE: 0, MODERATE: 1, EXPERIMENTAL: 2 };
+  const rk: Record<string, number> = { low: 0, medium: 1, high: 2 };
+  const cards = (d.cards as CardT[]).filter((c) => tier === "all" || c.tier === tier).sort((a, b) =>
+    sort === "net" ? (b.net_usd[0] + b.net_usd[1]) - (a.net_usd[0] + a.net_usd[1]) :
+    sort === "risk" ? rk[a.risk] - rk[b.risk] || order[a.tier] - order[b.tier] :
+    order[a.tier] - order[b.tier] || (b.net_usd[0] + b.net_usd[1]) - (a.net_usd[0] + a.net_usd[1]));
+  return (
+    <>
+      <h1>Сигналы <Badge label="SCENARIO" /></h1>
+      <Card title={`Строгий сигнал: ${STATUS_RU[d.strict.status] ?? d.strict.status}`}>
+        <p>{d.strict.text}</p>
+      </Card>
+      <Card title="Ваш капитал для ликвидности (REAL CAPITAL)">
+        <div className="capital"><input inputMode="numeric" placeholder="например 5000" defaultValue={capital ?? ""}
+          onChange={(e) => save(e.target.value)} /> <span>USD</span></div>
+        <p className="muted">Хранится только в этом браузере. Система не использует весь капитал: предлагается доля по уровню
+          проверки — проверенный до {pctAbs(d.tier_share.CONSERVATIVE, 0)}, умеренный до {pctAbs(d.tier_share.MODERATE, 0)},
+          экспериментальный до {pctAbs(d.tier_share.EXPERIMENTAL, 0)}. Не вкладывайте всё в одну позицию.</p>
+      </Card>
+      <div className="warnbox">{d.risk_warning}</div>
+      <div className="tabs" style={{ marginTop: 12 }}>
+        {[["all", "все"], ["CONSERVATIVE", "проверенные"], ["MODERATE", "умеренные"], ["EXPERIMENTAL", "экспериментальные"]].map(([k, t]) =>
+          <button key={k} className={`pill${tier === k ? " warn" : ""}`} onClick={() => setTier(k)}>{t}</button>)}
+        <span className="muted" style={{ marginLeft: 8 }}>сортировка:</span>
+        {[["tier", "надёжность"], ["net", "ожидаемый итог"], ["risk", "риск"]].map(([k, t]) =>
+          <button key={k} className={`pill${sort === k ? " warn" : ""}`} onClick={() => setSort(k)}>{t}</button>)}
+      </div>
+      {cards.length === 0 ? <Card><p>Сейчас подходящих вариантов нет. Это нормальная ситуация: система не создаёт сигналы ради
+        заполнения экрана и продолжает исследование.</p></Card> :
+        cards.map((c) => <SignalCard key={c.id} c={c} capital={capital} share={d.tier_share[c.tier]} />)}
+      <details><summary>Почему у остальных нет высокого рейтинга (диагностика)</summary>
+        <h3>Проверки рынка</h3>
+        <ul>{(d.market_checks as Any[]).map((m) => <li key={m.name} className={m.passed ? "" : "warn"}>{m.passed ? "✓" : "✗"} {m.ru}: {typeof m.value === "number" ? num(m.value, 3) : String(m.value)}</li>)}</ul>
+        <h3>Пулы с проблемами</h3>
+        <ul>{(d.pools_with_problems as Any[]).map((p) => <li key={p.pair + p.fee_tier}>{p.pair} {pctAbs(p.fee_tier, 2)}: {p.problems.join("; ")}</li>)}</ul>
+        <h3>Стратегии</h3>
+        <ul>{(d.diagnostics as Any[]).slice(0, 12).map((x) => <li key={x.strategy}>{x.strategy}: {x.blockers_ru.join("; ")}</li>)}</ul>
+      </details>
+    </>);
+}
+
+// ---------------------------------------------------------------- Portfolio
+function PosRow({ p }: { p: Any }) {
+  const m = p.mark ?? {};
+  return (
+    <tr><td>{p.pair}<div className="muted">{TIER_RU[p.tier]?.name} · {p.strategy}</div></td>
+      <td>{date(p.opened_at)}<div className="muted">{num(p.entry.price, 0)} · {num(p.entry.range[0], 0)}–{num(p.entry.range[1], 0)}</div></td>
+      <td>{usd(p.allocation_usd)}</td><td>{m.value_usd != null ? usd(m.value_usd, 2) : "—"}</td>
+      <td className={sign(m.net_usd)}>{m.net_usd != null ? usd(m.net_usd, 2) : "—"}</td>
+      <td>{m.fees_usd != null ? usd(m.fees_usd, 2) : "—"}</td><td className={sign(m.il_usd)}>{m.il_usd != null ? usd(m.il_usd, 2) : "—"}</td>
+      <td>{m.costs_usd != null ? usd(m.costs_usd, 2) : "—"}</td>
+      <td className={sign(m.vs_hodl_usd)}>{m.vs_hodl_usd != null ? usd(m.vs_hodl_usd, 2) : "—"}</td>
+      <td>{m.in_range == null ? "—" : m.in_range ? "да" : "нет"}<div className="muted"><Badge label={p.kind === "exact" ? "MODELED" : "ESTIMATED"} /></div>
+        {p.close_reason && <div className="muted">{p.close_reason}</div>}</td></tr>);
+}
+
+export function Portfolio() {
+  const { data: d, error } = useApi<Any>("/api/lab/portfolio");
+  if (!d) return <Loading error={error} />;
+  const head = <thead><tr><th>Пара</th><th>Открыта · цена · диапазон</th><th>Вложено</th><th>Стоимость</th><th>Итог</th>
+    <th>Комиссии</th><th>Потеря к хранению</th><th>Расходы</th><th>К хранению</th><th>В диапазоне</th></tr></thead>;
+  return (
+    <>
+      <h1>Виртуальный портфель <Badge label="MODELED" /></h1>
+      <p className="lead">Виртуальные деньги, без транзакций. Позиции открываются по лучшим возможностям и ведутся на новых данных;
+        цена, диапазон и состав фиксируются при открытии. Капитал задаётся в <code>config/lab.yaml</code> (portfolio.virtual_capital_usd).</p>
+      <div className="grid stats">
+        <Stat title="Начальный баланс" value={usd(d.initial_usd)} />
+        <Stat title="Текущий баланс" label="MODELED" value={usd(d.balance_usd, 2)} tone={sign(d.pnl_usd)} hint={`свободно ${usd(d.cash_usd)}`} />
+        <Stat title="Прибыль / убыток" value={usd(d.pnl_usd, 2)} tone={sign(d.pnl_usd)} hint={`за сутки ${d.day_change_usd == null ? "—" : usd(d.day_change_usd, 2)}`} />
+        <Stat title="Комиссии · потеря к хранению · расходы" value={`${usd(d.fees_usd, 2)} · ${usd(d.il_usd, 2)} · ${usd(d.costs_usd, 2)}`} />
+      </div>
+      {d.history.length > 1 && <Card title="Баланс по дням"><Spark values={d.history.map((h: Any) => h.balance_usd)} /></Card>}
+      <Card title={`Открытые позиции: ${d.open.length}`}>
+        {d.open.length === 0 ? <p className="muted">Открытых позиций нет.</p> :
+          <div className="table-wrap"><table className="table">{head}<tbody>{d.open.map((p: Any) => <PosRow key={p.id} p={p} />)}</tbody></table></div>}
+      </Card>
+      <Card title={`Закрытые позиции: ${d.closed.length}`}>
+        {d.closed.length === 0 ? <p className="muted">Закрытых пока нет (позиция закрывается через 30 дней или когда стратегия выпадает из рейтинга на 3 дня).</p> :
+          <div className="table-wrap"><table className="table">{head}<tbody>{d.closed.map((p: Any) => <PosRow key={p.id} p={p} />)}</tbody></table></div>}
+      </Card>
+      <p className="muted">МОДЕЛЬ — точная реконструкция пула WBTC/USDC 0,3%; ОЦЕНКА — часовые данные других пулов (приближённо).</p>
+    </>);
+}
+
+// ---------------------------------------------------------------- Research
+export function Research() {
+  const { data: d, error } = useApi<Any>("/api/lab/research");
+  if (!d) return <Loading error={error} />;
+  const f = d.foundation;
+  return (
+    <>
+      <h1>Исследования</h1>
+      <Card title="Фундамент: историческое исследование" label="MODELED">
+        <p>{f.pool}: {num(f.experiments, 0)} расчётов, {num(f.strategies, 0)} стратегий, период {f.period}. {f.note}.</p>
+      </Card>
+      <Card title="Чему система научилась на ошибках прогнозов">
+        {d.lessons.length === 0 ? <p className="muted">Первые проверки прогнозов будут через 7 дней после открытия виртуальных позиций
+          ({d.forecasts.length ? date(Math.min(...d.forecasts.map((x: Any) => x.due))) : "—"}). Сейчас идут промежуточные сравнения.</p> :
+          <ul>{d.lessons.map((l: Any, i: number) => <li key={i}>{date(l.at)} · {l.strategy}: {l.reasons.join(", ") || "прогноз совпал"} → {l.action}</li>)}</ul>}
+        <p className="muted">Калибровка сканера: {d.scanner_calibration?.factor ? `часовая оценка комиссий умножается на ${num(d.scanner_calibration.factor, 2)} (сверка с точной моделью)` : "ещё не рассчитана"}.
+          {" "}Калибровка прогнозов: {d.fee_calibration_forecasts.factor ? num(d.fee_calibration_forecasts.factor, 2) : d.fee_calibration_forecasts.note}.</p>
+      </Card>
+      <Card title="Прогнозы на проверке" label="SCENARIO">
+        {d.forecasts.length === 0 ? <p className="muted">Прогнозов пока нет.</p> :
+          <div className="table-wrap"><table className="table"><thead><tr><th>Стратегия</th><th>Прогноз комиссий</th><th>Факт сейчас</th><th>Причины расхождения</th><th>Итоговая проверка</th></tr></thead>
+            <tbody>{d.forecasts.map((x: Any) => <tr key={x.id}><td>{x.strategy}<div className="muted">{TIER_RU[x.tier]?.name}</div></td>
+              <td>{usd(x.forecast.fees_usd[0], 2)} – {usd(x.forecast.fees_usd[1], 2)} за 7 дн.</td>
+              <td>{x.checkpoint ? <>{usd(x.checkpoint.fees_actual, 2)} за {num(x.checkpoint.days, 1)} дн. (ожидалось {usd(x.checkpoint.fees_forecast[0], 2)}–{usd(x.checkpoint.fees_forecast[1], 2)})</> : "ждёт данных"}</td>
+              <td>{x.checkpoint?.reasons?.length ? x.checkpoint.reasons.map((r: string) => d.reason_names[r] ?? r).join("; ") : "—"}</td>
+              <td>{x.status === "reviewed" ? "проверено" : date(x.due)}</td></tr>)}</tbody></table></div>}
+      </Card>
+      <Card title={`Гипотезы: ${d.hypotheses.length}`}>
+        <p className="muted">Гипотезы создаёт сама система (правила обучения; с ключом Claude — ещё и языковая модель).
+          Проверка — на всей сохранённой истории; «подтверждено» значит: на данных, которые стратегия не видела, была лучше простого размещения.
+          Если параметры придуманы после просмотра этих данных, это отмечено — такая проверка слабее.</p>
+        {d.hypotheses.map((h: Any) => (
+          <details key={h.id}><summary><Pill tone={h.verdict === "confirmed" ? "pos" : h.verdict === "rejected" ? "neg" : "warn"}>
+            {h.verdict === "confirmed" ? "подтверждено" : h.verdict === "rejected" ? "отклонено" : h.status}</Pill> {date(h.created_at)} · {h.title}</summary>
+            <p>{h.description}</p><p className="muted">{h.rationale}</p><p>{h.conclusion}</p>
+            {h.oos_contaminated && <p className="warn">Параметры выбраны после просмотра проверочных данных — нужна проверка в виртуальном портфеле.</p>}
+            <ul>{h.strategies.map((s: Any) => <li key={s.strategy}>{s.strategy}: {s.verdict}, к простому размещению {pct(s.oos_vs_passive)} ({s.positive}/7)</li>)}</ul>
+          </details>))}
+      </Card>
+      <Card title="Дальше в плане">
+        {d.next_tasks.length === 0 ? <p className="muted">План появится после ежедневного исследования.</p> :
+          <ul>{d.next_tasks.map((t: Any) => <li key={t.title}>{t.title}</li>)}</ul>}
+      </Card>
+      <p className="muted">Достоверность: {Object.entries(CONF_RU).map(([k, v]) => `${k} = ${v}`).join(", ")}.</p>
+    </>);
+}
+
+// ---------------------------------------------------------------- Activity log
+export function Activity() {
+  const { data: d, error } = useApi<Any>("/api/lab/activity");
+  const [only, setOnly] = useState("all");
+  if (!d) return <Loading error={error} />;
+  const items = (d.items as Any[]).filter((a) => only === "all" || a.status === only);
+  return (
+    <>
+      <h1>Журнал действий</h1>
+      <p className="lead">Реальные действия системы по времени (МСК). Ошибки и пропуски записываются как есть.</p>
+      <div className="tabs">{[["all", "все"], ["error", "ошибки"], ["warn", "предупреждения"], ["ok", "успешно"]].map(([k, t]) =>
+        <button key={k} className={`pill${only === k ? " warn" : ""}`} onClick={() => setOnly(k)}>{t}</button>)}</div>
+      <Card>{items.map((a) => <div className="log-item" key={a.id}><span className="muted">{date(a.at)}</span>
+        <span><Pill tone={STATUS_TONE[a.status]}>{KIND_RU[a.kind] ?? a.kind}</Pill> {a.message}</span></div>)}</Card>
+    </>);
+}

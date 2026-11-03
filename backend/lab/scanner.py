@@ -390,7 +390,13 @@ def scan(engine, client, cfg, pools: list[ScanPool], now: int | None = None) -> 
             swap_cost = CAPITAL_USD * (1 - pos["share_token1_value"] if p.base == p.token0 else pos["share_token1_value"]) * p.fee / 1e6
             costs = gas_usd + swap_cost
             net = [fees_h[0] + il_mid - costs, fees_h[1] + il_mid - costs]
+            scen = []
+            for ch in (-0.2, -0.1, 0.1, 0.2):   # value of the position if the base price moves
+                hold_ch = (pos["amount0"] * u0 * ch if p.base == p.token0 else pos["amount1"] * u1 * ch)
+                il_ch = il_at(pos, p, ch, u0, u1)
+                scen.append({"change": ch, "il_usd": il_ch, "position_change_usd": hold_ch + il_ch})
             ranges.append({"width": w, "price_lower": pos["price_lower"], "price_upper": pos["price_upper"],
+                           "scenarios": scen,
                            "L": pos["L"], "sa": pos["sa"], "sb": pos["sb"],
                            "amount0": pos["amount0"], "amount1": pos["amount1"],
                            "share_quote_value": pos["share_token1_value"] if p.quote == p.token1 else 1 - pos["share_token1_value"],
@@ -419,6 +425,7 @@ def scan(engine, client, cfg, pools: list[ScanPool], now: int | None = None) -> 
             problems.append("ни один диапазон не даёт положительного ожидаемого результата после расходов")
         results.append({
             "pool": p.key, "pair": f"{p.base}/{p.quote}", "address": p.address, "fee_tier": p.fee / 1e6,
+            "token0": p.token0, "token1": p.token1,
             "price": base_price(st["sqrt_price"], p), "tick": st["tick"],
             "tvl_usd": tvl, "active_liquidity_usd_2pct": active_usd,
             "volume_usd": vol_usd, "fees_usd": fees_usd,

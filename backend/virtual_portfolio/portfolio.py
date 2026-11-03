@@ -286,9 +286,9 @@ def register_opportunities(engine, ranking: dict, strategies: dict, start_block:
     return out
 
 def mark_forward_tests(engine, ds: Dataset, state_at_fn, latest_block: int,
-                       priority_fee_gwei: float = 1.0) -> list[dict]:
+                       priority_fee_gwei: float = 1.0, skip_ids: set[int] | None = None) -> list[dict]:
     with engine.connect() as conn:
-        tests = conn.execute(select(S.forward_tests)).all()
+        tests = [t for t in conn.execute(select(S.forward_tests)).all() if t.id not in (skip_ids or set())]
     out = []
     by_start: dict[tuple, list] = {}
     for t in tests:

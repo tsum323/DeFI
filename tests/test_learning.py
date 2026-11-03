@@ -7,8 +7,15 @@ import json
 from sqlalchemy import insert, select
 
 from backend.database import schema as S
-from backend.lab.learning import (LearningAdapter, compare, fee_calibration, plan_for, reasons_for,
-                                  record_forecast, review_forecasts)
+from backend.lab.learning import (
+    LearningAdapter,
+    compare,
+    fee_calibration,
+    plan_for,
+    reasons_for,
+    record_forecast,
+    review_forecasts,
+)
 from backend.strategies.generator import StrategyParams
 
 FC = {"fees_usd": [40.0, 80.0], "il_usd": -20.0, "costs_usd": 10.0, "net_vs_hodl_usd": [10.0, 50.0],

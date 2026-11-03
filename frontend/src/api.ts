@@ -1,5 +1,5 @@
 // Typed fetch helpers for the read-only dashboard API.
-export type Label = "EXACT" | "MODELED" | "SCENARIO";
+export type Label = "EXACT" | "MODELED" | "SCENARIO" | "ESTIMATED";
 export interface Labeled<T> { value: T; label: Label }
 
 // Static snapshot build (VITE_STATIC=1): data comes from JSON files exported next to the page.

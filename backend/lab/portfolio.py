@@ -105,10 +105,11 @@ def open_from_scan(engine, cfg, scan: dict, exclude_pools: set[str], n: int = 2,
     """Best scanner pools (other than the exactly modelled one) -> ESTIMATED positions."""
     now = now or int(time.time())
     st = _settings(cfg)
-    open_pools = {r.pool for r in _open_rows(engine)}
+    open_pairs = {r.pair for r in _open_rows(engine) if r.kind == "estimated"}
     out = []
     for p in scan["pools"]:
-        if len(out) >= n or p["pool"] in exclude_pools or p["pool"] in open_pools:
+        # one estimated position per pair (diversified; fee tiers of a pair move together)
+        if len(out) >= n or p["pool"] in exclude_pools or p["pair"] in open_pairs:
             continue
         b = p.get("best")
         if p["score"] is None or not b or b["net_mid_usd"] <= 0 or p["problems"]:
@@ -129,7 +130,7 @@ def open_from_scan(engine, cfg, scan: dict, exclude_pools: set[str], n: int = 2,
                 opened_at=now, kind="estimated", tier="EXPERIMENTAL", pool=p["pool"], pair=p["pair"],
                 strategy=f"static ±{b['width']:.0%}", spec_hash=None, allocation_usd=alloc,
                 entry_json=json.dumps(entry), status="open"))
-        open_pools.add(p["pool"])
+        open_pairs.add(p["pair"])
         out.append(f"EXPERIMENTAL: {p['pair']} {p['fee_tier']:.2%} ±{b['width']:.0%} на ${alloc:,.0f}")
     return out
 

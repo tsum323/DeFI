@@ -143,6 +143,7 @@ def main() -> None:
     run("scripts.sync_pool", "--endpoint", "drpc", "--max-minutes", "15", check=False)
     run("scripts.evaluate_market")
     run("scripts.forward_test", check=False)
+    run("scripts.lab_cycle", check=False)  # scanner, virtual portfolio, learning, daily research
     after = latest_signal(engine)
     new_watch = [v for k, v in watch_names(engine).items() if k not in watch_before]
     new_conservative = conservative_entries(engine, ev_before)
@@ -155,14 +156,11 @@ def main() -> None:
     from backend.api.app import app
     c = TestClient(app)
     data = out / "data"
-    have = {p.stem.removeprefix("strategy_") for p in data.glob("strategy_*.json")}
-    for name in ("overview", "strategies", "research", "signals", "opportunities", "portfolio",
-                 "datasources"):
-        doc = c.get(f"/api/{name}").json()
-        if name == "strategies":
-            for r in doc["rows"]:
-                r["has_details"] = r["spec_hash"] in have
-        (data / f"{name}.json").write_text(json.dumps(doc))
+    data.mkdir(exist_ok=True)
+    (data / "datasources.json").write_text(json.dumps(c.get("/api/datasources").json()))
+    (data / "lab").mkdir(exist_ok=True)
+    for name in ("dashboard", "signals", "portfolio", "research", "activity"):
+        (data / "lab" / f"{name}.json").write_text(json.dumps(c.get(f"/api/lab/{name}").json()))
     ds = json.loads((data / "datasources.json").read_text())
     (data / "snapshot.json").write_text(json.dumps({
         "exported_at": int(time.time()), "last_block": ds["last_block"],
