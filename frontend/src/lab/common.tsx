@@ -24,7 +24,7 @@ export interface CardT {
   id: string; source: "exact" | "estimated"; tier: string; pair: string; network: string; pool_address: string;
   fee_tier: number; price: number; token0: string; token1: string; price_lower: number; price_upper: number; deposit_usd: number;
   token0_amount: number; token1_amount: number; quote_share: number | null; base: string; quote: string;
-  strategy: string; rule: string; horizon_days: number; fees_usd: [number, number]; il_usd: number;
+  strategy: string; strategy_ru?: string; rule: string; horizon_days: number; fees_usd: [number, number]; il_usd: number;
   scenarios: { change: number; il_usd: number; position_change_usd: number }[];
   gas_usd: number; swap_usd: number; net_usd: [number, number]; exit_probability: number | null;
   risk: string; risk_why: string; confidence: string; history: Record<string, any>; why: string[];
@@ -66,6 +66,7 @@ export function SignalCard({ c, capital, share }: { c: CardT; capital: number | 
         Ожидаемый результат за {c.horizon_days} дн. по сравнению с простым хранением токенов:{" "}
         <b className={sign(s.net[0] + s.net[1])}>{usd(s.net[0])} … {usd(s.net[1])}</b> — оценка модели, не гарантия.
       </p>
+      {c.strategy_ru && <p><b>Как устроено:</b> {c.strategy_ru}.</p>}
       <p><b>Почему:</b> {c.why.join("; ")}.</p>
       <p><b>Главный риск:</b> цена может выйти за диапазон — тогда комиссии перестанут начисляться, а позиция
         целиком превратится в один токен ({c.risk_why}).
@@ -77,7 +78,7 @@ export function SignalCard({ c, capital, share }: { c: CardT; capital: number | 
         <div className="grid two" style={{ marginTop: 10 }}>
           <div className="kv">
             <span>Сеть, пул</span><span>{c.network} · <code>{c.pool_address}</code></span>
-            <span>Правило</span><span>{RULE_RU[c.rule] ?? c.rule} ({c.strategy})</span>
+            <span>Правило</span><span>{c.strategy_ru ?? RULE_RU[c.rule] ?? c.rule} <span className="muted">({c.strategy})</span></span>
             <span>Доля {c.quote} при входе</span><span>{pctAbs(c.quote_share, 0)}</span>
             <span>Комиссии за {c.horizon_days} дн.</span><span>{usd(s.fees[0])} – {usd(s.fees[1])}</span>
             <span>Потеря к хранению (±1σ)</span><span>{usd(s.il)}</span>

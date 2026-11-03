@@ -143,7 +143,7 @@ def opportunity(ds, state, snap: MarketSnapshot, cand: Candidate, tier: str, blo
         reasons.append(f"за последние дни такой диапазон собрал бы ${fees[0]:,.0f}–${fees[1]:,.0f} комиссий "
                        f"за {p['horizon_days']} дн.")
     return {
-        "tier": tier, "strategy": cand.params.name, "spec_hash": cand.params.spec_hash,
+        "tier": tier, "strategy": cand.params.name, "spec_hash": cand.params.spec_hash, "params": p["params"],
         "pool": pool_meta["pool"], "pair": pool_meta["pair"], "pool_address": pool_meta["pool_address"],
         "network": pool_meta["network"], "fee_tier": pool_meta["fee_tier"],
         "current_price": snap.price, "range": rng, "allocation": p["allocation"],

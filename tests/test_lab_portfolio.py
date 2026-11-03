@@ -89,3 +89,12 @@ def test_estimated_position_fees_and_value():
     assert math.isclose(m["fees_usd"], 15.0, rel_tol=1e-6)   # half of each hour's fees
     assert abs(m["il_usd"]) < 1e-6 and m["in_range"] and m["time_in_range"] == 1.0
     assert math.isclose(m["net_usd"], 15.0 - 2.1, rel_tol=1e-6) and m["label"] == "ESTIMATED"
+
+
+def test_strategy_names_in_plain_russian():
+    from backend.lab.plain import describe, describe_static
+    p = StrategyParams(width_pct=0.3, ratio_token1=0.7, rebalance="on_exit", rebalance_delay_blocks=300)
+    assert describe(p) == ("диапазон ±30% от цены; 70% в USDC, 30% в WBTC; если цена выйдет из диапазона — "
+                           "новый диапазон вокруг цены через ~1 ч")
+    assert "не меняется" in describe(StrategyParams(width_pct=0.2)) and "поровну" in describe(StrategyParams(width_pct=0.2))
+    assert describe_static("static ±10%") == "диапазон ±10% от цены; диапазон не меняется"

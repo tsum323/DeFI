@@ -246,11 +246,19 @@ def summary(engine, cfg, now: int | None = None) -> dict:
         rows = conn.execute(select(S.portfolio_positions).order_by(S.portfolio_positions.c.id)).all()
         hist = conn.execute(select(S.portfolio_history).order_by(S.portfolio_history.c.day)).all()
     cap = _settings(cfg)["virtual_capital_usd"]
+    from backend.lab.plain import describe, describe_static
+    from backend.strategies.generator import params_from_json
+    with engine.connect() as conn:
+        params = {h: params_from_json(pj) for h, pj in conn.execute(
+            select(S.strategies.c.spec_hash, S.strategies.c.params_json))}
     pos = []
     for r in rows:
         m = json.loads(r.mark_json) if r.mark_json else None
+        base, quote = r.pair.split("/")
+        plain = (describe(params[r.spec_hash], base, quote) if r.spec_hash in params
+                 else describe_static(r.strategy))
         pos.append({"id": r.id, "opened_at": r.opened_at, "kind": r.kind, "tier": r.tier, "pool": r.pool,
-                    "pair": r.pair, "strategy": r.strategy, "allocation_usd": r.allocation_usd,
+                    "pair": r.pair, "strategy": r.strategy, "strategy_ru": plain, "allocation_usd": r.allocation_usd,
                     "entry": json.loads(r.entry_json), "mark": m, "status": r.status,
                     "closed_at": r.closed_at, "close_reason": r.close_reason})
 

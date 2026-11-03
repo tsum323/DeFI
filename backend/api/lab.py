@@ -44,6 +44,8 @@ def _strict(engine) -> dict:
 
 def _exact_card(o: dict) -> dict:
     """Opportunity (exact replay of WBTC/USDC 0.3%) in the common card shape."""
+    from backend.lab.plain import describe
+    from backend.strategies.generator import params_from_json
     rng, a = o["range"], o["allocation"]
     h = o["historical"]
     return {
@@ -52,7 +54,8 @@ def _exact_card(o: dict) -> dict:
         "price": o["current_price"], "price_lower": rng["price_lower"], "price_upper": rng["price_upper"],
         "deposit_usd": a["deposit_usd"], "token0_amount": a["token0"], "token1_amount": a["token1"],
         "quote_share": a.get("usdc_value_share"), "base": "WBTC", "quote": "USDC", "token0": "WBTC", "token1": "USDC",
-        "strategy": o["strategy"], "rule": o["rebalance_rule"], "horizon_days": o["horizon_days"],
+        "strategy": o["strategy"], "strategy_ru": describe(params_from_json(json.dumps(o["params"])))
+        if o.get("params") else o["strategy"], "rule": o["rebalance_rule"], "horizon_days": o["horizon_days"],
         "fees_usd": o["expected_fees_usd"], "il_usd": o["expected_il_usd"],
         "scenarios": [{"change": s["price_change"], "il_usd": s["il_usd"],
                        "position_change_usd": s["net_usd"][0] + o["costs_usd"]["gas_open"] + o["costs_usd"]["gas_close"]
@@ -94,7 +97,8 @@ def _scan_card(p: dict, scan: dict) -> dict | None:
         "price_lower": b["price_lower"], "price_upper": b["price_upper"], "deposit_usd": scan["capital_usd"],
         "token0_amount": b["amount0"], "token1_amount": b["amount1"], "quote_share": b["share_quote_value"],
         "base": base, "quote": quote, "token0": p.get("token0", base), "token1": p.get("token1", quote),
-        "strategy": f"диапазон ±{b['width']:.0%} без перестановок", "rule": "none",
+        "strategy": f"static ±{b['width']:.0%}", "strategy_ru": f"диапазон ±{b['width']:.0%} от цены; диапазон не меняется",
+        "rule": "none",
         "horizon_days": scan["horizon_days"], "fees_usd": b["fees_usd"], "il_usd": b["il_usd"],
         "scenarios": b.get("scenarios", []),
         "gas_usd": b["gas_usd"], "swap_usd": b["swap_usd"], "net_usd": b["net_vs_hodl_usd"],

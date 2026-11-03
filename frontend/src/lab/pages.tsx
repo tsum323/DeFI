@@ -108,7 +108,8 @@ export function Signals() {
 function PosRow({ p }: { p: Any }) {
   const m = p.mark ?? {};
   return (
-    <tr><td>{p.pair}<div className="muted">{TIER_RU[p.tier]?.name} · {p.strategy}</div></td>
+    <tr><td><b>{p.pair}</b> · {TIER_RU[p.tier]?.name}<div>{p.strategy_ru ?? p.strategy}</div>
+      <div className="muted" style={{ fontSize: 11 }}>{p.strategy}</div></td>
       <td>{date(p.opened_at)}<div className="muted">{num(p.entry.price, 0)} · {num(p.entry.range[0], 0)}–{num(p.entry.range[1], 0)}</div></td>
       <td>{usd(p.allocation_usd)}</td><td>{m.value_usd != null ? usd(m.value_usd, 2) : "—"}</td>
       <td className={sign(m.net_usd)}>{m.net_usd != null ? usd(m.net_usd, 2) : "—"}</td>
