@@ -137,7 +137,9 @@ def ingest_all(engine, cfg, clients: dict, pools: list[ScanPool], max_seconds: f
     prefs = cfg.lab["scanner"].get("networks", {})
     nets = sorted((n for n in {p.network for p in pools} if n in clients), key=lambda n: (n != "ethereum", n))
     out = []
-    for net in nets:
+    deadline = time.monotonic() + max_seconds
+    for i, net in enumerate(nets):
+        budget = max(5.0, (deadline - time.monotonic()) / (len(nets) - i))   # unused time goes to the next
         pr = prefs.get(net, {})
         cands = clients[net] if isinstance(clients[net], list) else [clients[net]]
         errors = []
@@ -146,7 +148,7 @@ def ingest_all(engine, cfg, clients: dict, pools: list[ScanPool], max_seconds: f
                 r = ingest(engine, c, [p for p in pools if p.network == net],
                            backfill_days=pr.get("backfill_days", cfg.lab["scanner"]["backfill_days"]),
                            step=pr.get("step", 100), batch=pr.get("batch", 3),
-                           max_seconds=max_seconds / max(1, len(nets)),
+                           max_seconds=budget,
                            block_time=cfg.networks[net].block_time_seconds, network=net)
                 r["endpoint"] = c.name
                 out.append(r)
