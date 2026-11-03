@@ -1,0 +1,33 @@
+# One-off read-only checks that need endpoints the development environment cannot reach
+# (e.g. L2 RPC nodes). Started by hand (Actions -> Tools -> Run workflow) or by the assistant.
+name: Tools
+on:
+  workflow_dispatch:
+    inputs:
+      script:
+        description: "script to run"
+        type: choice
+        options: [discover_networks]
+        default: discover_networks
+permissions:
+  contents: read
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - name: Run
+        run: |
+          mkdir -p out
+          python -m scripts.${{ inputs.script }} > out/result.json
+          cat out/result.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ inputs.script }}
+          path: out/result.json
