@@ -76,5 +76,6 @@ def test_recommended_amount_limits():
     g = amount_guide(c)
     assert round(g["min"]) == 10_000 * 2.0 / (0.1 * 20.0) and g["recommended"] == 10_000  # gas = 10% of fees
     assert round(g["max"]) == 200_000                                                         # 2% of active liquidity
+    assert round(g["breakeven"]) == round(10_000 * 2.0 / (20.0 - 5.0 - 1.0)) and g["min_profit"] == 1_500  # result > 0
     assert amount_guide({**c, "fees_usd": [0.0, 0.0]})["recommended"] is None                 # never pays off
     assert amount_guide({**c, "liquidity_share": 0.5})["recommended"] is None                 # too small a pool

@@ -98,6 +98,7 @@ export function Signals() {
   const c = cards.find((x) => x.id === picked) ?? best[0];
   const g = c?.amount_guide;
   const amount = choice === "rec" && g?.recommended != null ? g.recommended
+    : choice === "min" && g?.min_profit != null ? g.min_profit
     : choice === "own" ? Math.max(0, Number(amountS.replace(/\s/g, "")) || 0) : 0;
   const entry = c?.price ?? 0;
   const r = c && amount > 0 && choice !== "wait" ? plan(c, amount, entry) : null;
@@ -129,12 +130,17 @@ export function Signals() {
             Не вкладывайте деньги, потерю которых не можете себе позволить.</p>
           <div className="tabs">
             {g?.recommended != null && <button className={`pill${choice === "rec" ? " warn" : ""}`} onClick={() => setChoice("rec")}>взять рекомендуемую {usd(g.recommended)}</button>}
+            {g?.min_profit != null && <button className={`pill${choice === "min" ? " warn" : ""}`} onClick={() => setChoice("min")}>минимальная для дохода {usd(g.min_profit)}</button>}
             <button className={`pill${choice === "own" ? " warn" : ""}`} onClick={() => setChoice("own")}>своя сумма</button>
             <button className={`pill${choice === "wait" ? " warn" : ""}`} onClick={() => setChoice("wait")}>подождать других вариантов</button>
           </div>
           {choice === "own" && <div className="capital"><input inputMode="decimal" value={amountS} onChange={(ev) => setAmountS(ev.target.value)} /> <span>USD</span>
-            {g?.min != null && amount > 0 && amount < g.min && <span className="warn">меньше ~{usd(g.min)} — газ съест заметную часть дохода</span>}
+            {g?.breakeven != null && amount > 0 && amount < g.breakeven && <span className="neg">меньше ~{usd(g.breakeven)} — по расчёту дохода не будет: газ больше заработка</span>}
+            {g?.min != null && g?.breakeven != null && amount >= g.breakeven && amount < g.min && <span className="warn">меньше ~{usd(g.min)} — газ съест заметную часть дохода</span>}
             {g?.max != null && amount > g.max && <span className="warn">больше ~{usd(g.max)} — слишком большая доля в пуле, расчёт ненадёжен</span>}</div>}
+          {choice === "min" && g?.breakeven != null && <p className="muted">Минимальная сумма — та, при которой ожидаемые комиссии
+            покрывают газ, обмен и обычную потерю к хранению (порог ~{usd(g.breakeven)}). Доход при ней небольшой, а в плохом сценарии
+            возможен минус; с рекомендуемой суммой газ съедает меньшую часть дохода.</p>}
           {choice === "wait" && <div>
             <p>Хорошо, ничего не открываем. Система пересчитывает варианты каждые 15 минут и раз в день ищет новые стратегии;
               если появится более проверенный вариант, придёт уведомление.</p>

@@ -31,7 +31,8 @@ export interface CardT {
   blockers: string[]; to_improve: string[]; invalidation: string[]; valid_until: number; label: "MODELED" | "ESTIMATED";
   oos_contaminated?: boolean; token_risks?: string[]; variants: string[];
   base_usd?: number | null; quote_usd?: number | null; liquidity_share?: number | null;
-  amount_guide?: { recommended: number | null; min: number | null; max: number | null; why: string };
+  amount_guide?: { recommended: number | null; min: number | null; max: number | null; why: string;
+    min_profit?: number | null; breakeven?: number | null };
   entry?: { now: number; average_7d: number; low_7d: number; high_7d: number; recommended: number;
     reference_pool: string; reference_price: number; pool_vs_market: number; verdict: string; assumption: string } | null;
 }

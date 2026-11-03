@@ -202,15 +202,20 @@ def amount_guide(c: dict) -> dict:
     share = c.get("liquidity_share")
     max_amt = dep * POOL_SHARE_MAX / share if share else None
     if fees_mid <= 0 or edge <= 0:
-        return {"recommended": None, "min": None, "max": max_amt,
+        return {"recommended": None, "min": None, "max": max_amt, "min_profit": None, "breakeven": None,
                 "why": "по расчёту модели этот вариант не окупается ни при какой сумме — лучше подождать других вариантов"}
     min_amt = c["gas_usd"] / (GAS_SHARE_MAX * fees_mid)
+    breakeven = c["gas_usd"] / edge          # expected result vs holding = 0 at this amount
+    min_profit = _nice_up(breakeven * 1.01)
     rec = _nice_up(min_amt)
     if max_amt is not None and rec > max_amt:
-        return {"recommended": None, "min": min_amt, "max": max_amt,
+        return {"recommended": None, "min": min_amt, "max": max_amt, "min_profit": None, "breakeven": breakeven,
                 "why": f"чтобы газ был не больше 10% комиссий, нужно от ~${_ru(min_amt)}, но больше ~${_ru(max_amt)} "
                        "в этот пул ставить не стоит — вариант слишком мелкий для такого газа; лучше подождать"}
+    if max_amt is not None and min_profit > max_amt:
+        min_profit = None
     return {"recommended": rec, "min": min_amt, "max": _nice_down(max_amt) if max_amt else None,
+            "min_profit": min_profit, "breakeven": breakeven,
             "why": (f"от ~${_ru(min_amt)} газ (${c['gas_usd']:.2f}) занимает не больше 10% ожидаемых комиссий; "
                     + (f"больше ~${_ru(max_amt)} ставить не стоит: ваша доля превысит 2% работающей ликвидности пула"
                        if max_amt else "верхний предел по ликвидности пула не рассчитан"))}
