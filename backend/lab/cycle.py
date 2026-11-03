@@ -160,7 +160,7 @@ def run_tick(engine, cfg, *, client, ds=None, study=None, version: str | None = 
     for net, err in errors.items():
         log_activity(engine, "data", "error", f"Сеть {NETWORK_RU.get(net, net)}: нет доступного узла — пулы этой сети "
                      f"сейчас не обновляются ({err[:200]})")
-    rs = step(engine, "data", ingest_all, engine, cfg, fallbacks, pools, 300) or []
+    rs = step(engine, "data", ingest_all, engine, cfg, fallbacks, pools, 480) or []
     for r in rs:
         if r.get("error"):
             log_activity(engine, "data", "error", f"{NETWORK_RU.get(r['network'], r['network'])}: ни один узел не отдал "

@@ -71,3 +71,17 @@ def test_bot_waits_when_nothing_pays_off(tmp_path):
     r = bot.tick(engine, load_config(), scan, {ETH.key: ETH}, {}, now=10_000)
     assert r["action"] == "wait" and r["cash_usd"] == 100.0
     assert "ждёт" in recent_activity(engine)[0]["message"]
+
+
+def test_bot_moves_early_only_for_a_much_better_option(tmp_path):
+    engine = S.make_engine(f"sqlite:///{tmp_path / 'lab.sqlite'}")
+    cfg = load_config()
+    e_pool, sp_e, pos_e = pool_entry(ETH, gas=0.5, fees_week=(300.0, 400.0))
+    scan1 = {"capital_usd": 10_000.0, "horizon_days": 7, "eth_usd": 3000.0, "btc_usd": 80_000.0, "pools": [e_pool]}
+    t0 = 3600 * 1000
+    assert bot.tick(engine, cfg, scan1, {ETH.key: ETH}, {}, now=t0)["option"]["network"] == "ethereum"
+    b_pool, sp, pos = pool_entry(BASE, gas=0.02, fees_week=(4000.0, 6000.0))   # far better, cheap gas
+    scan2 = {**scan1, "pools": [e_pool, b_pool]}
+    h = {ETH.key: hours(ETH, sp_e, pos_e, 3, t0)}
+    bot.tick(engine, cfg, scan2, {ETH.key: ETH, BASE.key: BASE}, h, now=t0 + 3 * 3600)
+    assert bot._open(engine).network == "base" and len(bot._closed(engine)) == 1

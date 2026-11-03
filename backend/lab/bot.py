@@ -13,7 +13,8 @@ Rules (deterministic, explained in plain language in the activity log):
   re-centre / move — the price has been outside the range for out_of_range_hours: close and
             open again around the price (or elsewhere, if that is better now).
   switch  — at most once a day, after min_hold_days: only if the best option's expected
-            result beats the current one by switch_margin AFTER paying to close and reopen.
+            result beats the current one by switch_margin AFTER paying to close and reopen;
+            earlier only when it is at least 3x better after the moving costs.
   learn   — per network, the ratio of fees actually earned to fees forecast (pro rata) is
             kept as a trust factor (0.5-1.2) and applied to that network's forecasts.
 """
@@ -170,11 +171,14 @@ def tick(engine, cfg, scan: dict | None, scan_pools: dict, hours_by_pool: dict, 
         else:
             day = datetime.fromtimestamp(now, MSK).strftime("%Y-%m-%d")
             reviewed = (get_state(engine, "bot_review") or {}).get("day")
-            if reviewed != day and now - row.opened_at >= bc["min_hold_days"] * DAY and best is not None:
+            cur = next((o for o in opts if o["pool"] == row.pool and abs(o["width"] - row.width) < 1e-9), None)
+            cur_mid = cur["net_mid_usd"] if cur else 0.0
+            switch_cost = (best["gas_usd"] + best["swap_usd"]) if best else 0.0   # reopening elsewhere
+            # a much better option (3x after paying to move) does not wait for the holding period
+            strong = (best is not None and best["pool"] != row.pool
+                      and best["net_mid_usd"] - switch_cost > max(3 * cur_mid, 0.0) + 0.05)
+            if best is not None and (strong or (reviewed != day and now - row.opened_at >= bc["min_hold_days"] * DAY)):
                 set_state(engine, "bot_review", {"day": day})
-                cur = next((o for o in opts if o["pool"] == row.pool and abs(o["width"] - row.width) < 1e-9), None)
-                switch_cost = best["gas_usd"] + best["swap_usd"]   # reopening elsewhere
-                cur_mid = cur["net_mid_usd"] if cur else 0.0
                 if best["pool"] != row.pool and best["net_mid_usd"] - switch_cost > cur_mid * (1 + bc["switch_margin"]) + 0.01:
                     _close(engine, row, m, now, f"нашёлся вариант выгоднее: {_describe(best)} — ожидаемо "
                            f"${best['net_mid_usd']:,.2f} за неделю против ${cur_mid:,.2f} у текущей, даже с учётом "
