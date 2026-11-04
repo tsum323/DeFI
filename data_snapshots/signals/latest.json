@@ -1,135 +1,54 @@
 {
  "decision": "WAIT",
- "signal_id": 3,
+ "signal_id": 5,
  "snapshot": {
-  "block": 26325651,
-  "timestamp": 1793605115,
-  "data_age_seconds": 806,
-  "sqrt_price": "2214943278026938587274230864005",
-  "tick": 66616,
-  "price": 78156.6705732945,
-  "active_liquidity": 2493885044289,
-  "tvl_token0": 14598726904,
-  "tvl_token1": 9791105943268,
-  "tvl_usd": 21200984.837522194,
-  "volume_24h_usd": 1100276.809345,
-  "volume_7d_usd": 64576042.201788,
-  "fees_7d_usd": 193728.126605364,
-  "fee_apr_7d": 0.476465508916303,
-  "volume_30d_usd": 100253854.572122,
-  "fee_apr_30d": 0.17259885424785384,
-  "median_daily_volume_30d_usd": 1463447.605432,
-  "vol_1d": 0.1617230907193054,
-  "vol_7d": 0.3700575609631673,
-  "vol_30d": 0.3363895079484882,
-  "change_7d": -0.02019232842043228,
-  "change_30d": -0.07456938980573935,
+  "block": 26336727,
+  "timestamp": 1793738435,
+  "data_age_seconds": 815,
+  "sqrt_price": "2207473889472777195330430605400",
+  "tick": 66548,
+  "price": 77630.42847040761,
+  "active_liquidity": 2499075700176,
+  "tvl_token0": 14951335833,
+  "tvl_token1": 9637335516505,
+  "tvl_usd": 21244121.585712485,
+  "volume_24h_usd": 1522850.360404,
+  "volume_7d_usd": 64955521.830785,
+  "fees_7d_usd": 194866.565492355,
+  "fee_apr_7d": 0.47829228642810495,
+  "volume_30d_usd": 102905460.386064,
+  "fee_apr_30d": 0.17680417092968567,
+  "median_daily_volume_30d_usd": 1871596.805114,
+  "vol_1d": 0.18292739051239784,
+  "vol_7d": 0.3775123133776264,
+  "vol_30d": 0.3392626724930503,
+  "change_7d": -0.03670745678597931,
+  "change_30d": -0.09588160598621942,
   "trend": "flat",
   "vol_class": "low",
-  "base_fee_wei": 38056284,
+  "base_fee_wei": 54838993,
   "eth_usd": 2252.73
  },
  "payload": {
   "type": "WAIT",
-  "created_at": 1793606017,
-  "block": 26325651,
+  "created_at": 1793740126,
+  "block": 26336727,
   "pool": "wbtc_usdc_3000",
   "pair": "WBTC/USDC",
   "network": "ethereum",
   "pool_address": "0x99ac8cA7087fA4A2A1FB6357269965A2014ABc35",
   "fee_tier": 0.003,
-  "current_price": 78156.6705732945,
+  "current_price": 77630.42847040761,
   "reasons": [
    {
     "name": "no_validated_strategy",
     "passed": false,
-    "value": "0 of 396 strategies pass all filters",
+    "value": "0 of 0 strategies pass all filters",
     "threshold": "all SPEC 11.4 checks"
    }
   ],
-  "closest_candidates": [
-   {
-    "strategy": "w0.2_r1=0.9_exit_d7200",
-    "failed": [
-     "stable_across_periods"
-    ],
-    "oos_mean_excess": 0.045,
-    "oos_mean_roi": 0.031647302042857144
-   },
-   {
-    "strategy": "w0.2_r1=0.9_exit_d7200_cool72h",
-    "failed": [
-     "stable_across_periods"
-    ],
-    "oos_mean_excess": 0.0447,
-    "oos_mean_roi": 0.03133015311428571
-   },
-   {
-    "strategy": "w0.2_r1=0.9_static",
-    "failed": [
-     "stable_across_periods"
-    ],
-    "oos_mean_excess": 0.0442,
-    "oos_mean_roi": 0.03082698547142857
-   },
-   {
-    "strategy": "w0.15_r1=0.9_static",
-    "failed": [
-     "stable_across_periods"
-    ],
-    "oos_mean_excess": 0.0428,
-    "oos_mean_roi": 0.029507283428571427
-   },
-   {
-    "strategy": "w0.2_r1=0.8_exit_d7200_cool72h",
-    "failed": [
-     "stable_across_periods"
-    ],
-    "oos_mean_excess": 0.0425,
-    "oos_mean_roi": 0.0292025665
-   }
-  ],
-  "watch": [
-   {
-    "strategy": "w0.2_r1=0.9_exit_d7200",
-    "spec_hash": "3d54045d61114bcac72ffa5eafd4cb2a864a2eb6ef89f1280d475d0b970952a7",
-    "failed": "stable_across_periods",
-    "value": {
-     "is_mean_excess": -0.0432,
-     "is_positive": 5
-    },
-    "threshold": "IS excess > 0 in >= half of segments",
-    "oos_mean_excess": 0.045,
-    "oos_mean_roi": 0.031647302042857144,
-    "oos_contaminated": true
-   },
-   {
-    "strategy": "w0.2_r1=0.9_exit_d7200_cool72h",
-    "spec_hash": "b66131620331bbebbada0ba13befc2c8b5bcd4eb89ee2db0f138f585468387d8",
-    "failed": "stable_across_periods",
-    "value": {
-     "is_mean_excess": -0.0435,
-     "is_positive": 5
-    },
-    "threshold": "IS excess > 0 in >= half of segments",
-    "oos_mean_excess": 0.0447,
-    "oos_mean_roi": 0.03133015311428571,
-    "oos_contaminated": true
-   },
-   {
-    "strategy": "w0.2_r1=0.9_static",
-    "spec_hash": "f34cf0bd1513d5795ac32d5577cf9bc1e94be9cfacc047106722291a6764d80a",
-    "failed": "stable_across_periods",
-    "value": {
-     "is_mean_excess": -0.0455,
-     "is_positive": 6
-    },
-    "threshold": "IS excess > 0 in >= half of segments",
-    "oos_mean_excess": 0.0442,
-    "oos_mean_roi": 0.03082698547142857,
-    "oos_contaminated": true
-   }
-  ],
+  "closest_candidates": [],
+  "watch": [],
   "label": "SCENARIO"
  }
 }
