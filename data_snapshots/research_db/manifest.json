@@ -1,16 +1,16 @@
 {
  "tables": {
   "activity": {
-   "rows": 120,
-   "sha256": "0bd2ffd148a22aed3d06108fd23d05da01044159e244a78b6cfc9a1ef53d5229"
+   "rows": 603,
+   "sha256": "1ac28ad24cb3af29fb4854b7e30edf6a5ff3df5f72ac05a408c7563ba44e8dfe"
   },
   "bot_history": {
    "rows": 2,
-   "sha256": "744c539deba1040a097c13474f578893e0570e02af4f880b1183dfe6e47f030e"
+   "sha256": "36bac81c368f699a9b81684685d54716d1f5f369fbcbf24f6d240acae9c0cf83"
   },
   "bot_positions": {
-   "rows": 2,
-   "sha256": "232a527e60ed78a0a09ef8d95705b2a0ecf39c259240ed594e0b37b243e6266f"
+   "rows": 1,
+   "sha256": "69fd246a3a4991060a091d9b1ce07f97423bcac52448f208098cc97b210edb98"
   },
   "datasets": {
    "rows": 43,
@@ -22,11 +22,11 @@
   },
   "forecasts": {
    "rows": 3,
-   "sha256": "3921416eddacd4c48f099d817941cc5d1ac1ece3d6a976a3e7e2ea6f45b6714f"
+   "sha256": "7997c6db0395698802647fed0b11b215076d0241f79b83afa6359ec1643d86b4"
   },
   "forward_tests": {
    "rows": 18,
-   "sha256": "48cab391cfae557fdc4fd73c975d0fc9d51c7696ebaa926811a2469fa7cd6928"
+   "sha256": "b96892015ac464ae9b0e43b7b2c026b0a0d1a53b7d2176f9b26a29ab90aa1533"
   },
   "hypotheses": {
    "rows": 8,
@@ -41,52 +41,52 @@
    "sha256": "e04134c1b590548dce6cad510bb8efaa2b04549d8833b0bbf085b2ee7f8af8b3"
   },
   "lab_state": {
-   "rows": 4,
-   "sha256": "67870940e10c55aaaf89a15a208dc377411396cb837f9b10536378f551fd3b7d"
+   "rows": 8,
+   "sha256": "3618dfdd05f64d7f90e704c63d752e152f31b92d1a5c0da816013ce65695f5e7"
   },
   "lessons": {
    "rows": 0,
    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
   },
   "market_evaluations": {
-   "rows": 186,
-   "sha256": "bce818f1c8abb739dd9e4031aa304d122ae73fbc46acf522aecd07da2eac4dd9"
+   "rows": 280,
+   "sha256": "0ae23d3e3186146cb6803c9956ac9262adb2c11c80eea679db4b622cc984ef1c"
   },
   "opportunity_events": {
-   "rows": 337,
-   "sha256": "d79c3c0d6c129b6be70b38c421d47acbb883a73348ccc895b86d800f167b0650"
+   "rows": 589,
+   "sha256": "c4ac213145c7f58a41676900ee914f556f6dcb275a1bf3cf94057817b8fa225e"
   },
   "opportunity_rankings": {
    "rows": 1,
-   "sha256": "f03d33cf78e0e5b2b935a99a5feea93e50d8ee3b4af464275a07f3450f56cf0e"
+   "sha256": "45a2bcefc8f53714857b68e58e6cfac91c03cb0e3e6a617647ac3f15d5a000e9"
   },
   "pool_hours": {
-   "rows": 7453,
-   "sha256": "30d429cc29408b63b6cb6c910c63d0a3b3f888ac07325d80fed5ce30ae2fb4d2"
+   "rows": 7771,
+   "sha256": "153b213b48bbfc6a4a18dde617d1c5ae15c786184cba47beedbdeb52e9b8beef"
   },
   "portfolio_history": {
    "rows": 2,
-   "sha256": "6a5b0e241beb710322c83896a054b1b67fe1964cf338529ac55870d7d19ec8d0"
+   "sha256": "eb8f2ee579be798ac94d381e051efd7bcae39054395e3c6e1396951171b19da7"
   },
   "portfolio_positions": {
-   "rows": 7,
-   "sha256": "9adbf98c55e51560a14d3d17a10dad7f8702915ffd3f2cb71ad661baf9221c4d"
+   "rows": 8,
+   "sha256": "b0d22ec6714db37e27e7ccf152b95b1265213fbfb097256d6b6a85401ecd1f44"
   },
   "scan_results": {
    "rows": 1,
-   "sha256": "d65fe3548c2b9b7cfd1d0abae47230b8f35a103a1adcd38b7a28e9ec10367159"
+   "sha256": "590f067ea961a9ff5696e27a9a6d620e6ab0d720afff22f64ca514d647eab7da"
   },
   "scan_state": {
    "rows": 4,
-   "sha256": "d0cb06559c48b5a9d7444b0d60609244da8d4104c35f70befcd7a1a14f21fd13"
+   "sha256": "57224e60b216d169ee26f8e3cad0c2af9d72ede0460bf4c54547bd24a73eb7ce"
   },
   "signal_events": {
-   "rows": 5,
-   "sha256": "774ecaa46973b6e59ce67c46ac6c4a9113400921042c49c623bc4bee17029b4b"
+   "rows": 7,
+   "sha256": "4c1b0feda863eaea1e271d76e7b67e5f9f8f1c4596a51b0c6da43111b27b9ac4"
   },
   "signals": {
-   "rows": 5,
-   "sha256": "2d76c7a2daaefb9d995ce663284628b8c4e50450eafaad8e3c4f64e6786bdc9c"
+   "rows": 7,
+   "sha256": "2a612ca92c6aa32b6cafb6c62e3ea0fbceb53dd3cf4e3018ea848f15c02b4546"
   },
   "strategies": {
    "rows": 1018,
@@ -94,7 +94,7 @@
   },
   "tracked_positions": {
    "rows": 1,
-   "sha256": "8396a9ffe4a17967ccf4e44c00ed2ab05c9aa4bbb78a3c3afa7d49e079be9eef"
+   "sha256": "efd49b5838e4a4251c8672c909c1aa5a070edd37ba235a64a537c6e9796b50de"
   },
   "validation_reports": {
    "rows": 936,
