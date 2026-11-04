@@ -63,3 +63,28 @@ def test_repair_once_rebuilds_hours_and_restarts_bot(tmp_path):
     with engine.connect() as c:
         assert not c.execute(select(S.scan_state)).all() and not c.execute(select(S.bot_positions)).all()
     assert any("перезапущен" in a["message"] for a in recent_activity(engine))
+
+
+def test_repair_derived_drops_inflated_calibration_and_history(tmp_path):
+    import json
+
+    from backend.core.config import load_config
+    from backend.lab.cycle import INFLATED_FROM, repair_derived_once
+    from backend.lab.scanner import get_state, set_state
+    engine = S.make_engine(f"sqlite:///{tmp_path / 'lab.sqlite'}")
+    set_state(engine, "scanner_fee_calibration", {"factor": 0.3})
+    with engine.begin() as c:
+        for day in ("2026-11-03", "2026-11-04"):
+            c.execute(insert(S.portfolio_history).values(day=day, created_at=0, payload_json="{}"))
+        for opened in (INFLATED_FROM - 3600, INFLATED_FROM + 3600):
+            c.execute(insert(S.portfolio_positions).values(
+                opened_at=opened, kind="estimated", tier="EXPERIMENTAL", pool="weth_usdc_500", pair="WETH/USDC",
+                strategy="static ±10%", allocation_usd=500, entry_json="{}", status="open"))
+    assert repair_derived_once(engine, load_config(), INFLATED_FROM + 86_400) is True
+    assert repair_derived_once(engine, load_config(), INFLATED_FROM + 86_400) is False
+    assert get_state(engine, "scanner_fee_calibration") is None
+    with engine.connect() as c:
+        assert [r.day for r in c.execute(select(S.portfolio_history))] == ["2026-11-04"]
+        notes = [json.loads(r.entry_json).get("forecast_note") for r in
+                 c.execute(select(S.portfolio_positions).order_by(S.portfolio_positions.c.opened_at))]
+    assert notes[0] is None and "завышен" in notes[1]

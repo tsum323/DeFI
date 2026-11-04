@@ -77,6 +77,41 @@ def repair_once(engine, cfg) -> bool:
     return True
 
 
+DATA_FIX2 = "data_fix_2026_11_04b"
+INFLATED_FROM = 1_793_710_800   # first hour with re-counted swaps (3 Nov 2026 13:00 UTC)
+
+
+def repair_derived_once(engine, cfg, now: int) -> bool:
+    """Second part of the 2026-11-04 repair: values DERIVED from the inflated hours.
+    - the scanner fee calibration computed on 4 Nov 03:00 MSK (it divided the exact replay by
+      inflated hourly fees, so it now shrinks the correct estimates) is dropped and recomputed;
+    - the portfolio's 3 Nov daily balance (it contained inflated fees) is removed, so the
+      "за сутки" change is not measured against a fake number;
+    - estimated positions opened from the inflated ranking keep their real result (it is
+      recomputed from the rebuilt hours), but their opening forecast is marked as wrong."""
+    from backend.lab.scanner import get_state, set_state
+    if get_state(engine, DATA_FIX2):
+        return False
+    note = "прогноз при открытии был завышен из-за ошибки данных 3–4 ноября; результат пересчитан по исправленным данным"
+    with engine.begin() as c:
+        c.execute(S.lab_state.delete().where(S.lab_state.c.key == "scanner_fee_calibration"))
+        c.execute(S.portfolio_history.delete().where(S.portfolio_history.c.day < "2026-11-04"))
+        rows = c.execute(select(S.portfolio_positions).where(S.portfolio_positions.c.kind == "estimated",
+                                                             S.portfolio_positions.c.opened_at >= INFLATED_FROM)).all()
+        for r in rows:
+            e = json.loads(r.entry_json)
+            e["forecast_note"] = note
+            c.execute(S.portfolio_positions.update().where(S.portfolio_positions.c.id == r.id)
+                      .values(entry_json=json.dumps(e)))
+    set_state(engine, DATA_FIX2, {"done": True, "at": now, "positions_marked": len(rows)})
+    log_activity(engine, "portfolio", "warn", "Портфель после исправления данных: удалена запись баланса за 3 ноября "
+                 f"(в ней были завышенные комиссии); у {len(rows)} приближённых позиций отмечено, что прогноз при "
+                 "открытии был завышен. Их фактический результат пересчитан по исправленным часовым данным.")
+    log_activity(engine, "calibration", "warn", "Калибровка комиссий сканера от 4 ноября 03:00 МСК была посчитана по "
+                 "завышенным данным и сброшена; она будет посчитана заново, как только загрузится неделя часовых данных.")
+    return True
+
+
 def latest_ranking(engine) -> dict | None:
     with engine.connect() as c:
         v = c.execute(select(S.opportunity_rankings.c.payload_json).order_by(
@@ -178,6 +213,7 @@ def run_tick(engine, cfg, *, client, ds=None, study=None, version: str | None = 
     sc = cfg.lab["scanner"]
     pools = scan_pools(cfg, sc["pools"])
     step(engine, "data", repair_once, engine, cfg)
+    step(engine, "data", repair_derived_once, engine, cfg, now)
     for net in step(engine, "data", repair_bad_hours, engine, cfg) or []:
         log_activity(engine, "data", "warn", f"{NETWORK_RU.get(net, net)}: найдено неверное время обменов — "
                      "часовые данные этой сети удалены и загружаются заново")
@@ -261,6 +297,17 @@ def run_tick(engine, cfg, *, client, ds=None, study=None, version: str | None = 
     for le in (rv or {}).get("lessons", []):
         log_activity(engine, "learning", "info", f"Проверен прогноз {le['strategy']}: "
                      f"{', '.join(le['reasons']) or 'в пределах ожиданий'} → {le['action']}")
+    from backend.lab.scanner import get_state as _gs
+    if ds is not None and _gs(engine, "scanner_fee_calibration") is None and \
+            now - ((_gs(engine, "calibration_try") or {}).get("at") or 0) >= 3600:
+        # no calibration (e.g. dropped by a data repair): retry hourly until a week of hours exists
+        from backend.backtesting.dataset import cached_state_at
+        set_state(engine, "calibration_try", {"at": now})
+        cal = step(engine, "calibration", calibrate_fees, engine, cfg, ds, lambda b: cached_state_at(ds, b))
+        if cal and cal.get("factor"):
+            set_state(engine, "scanner_fee_calibration", cal)
+            log_activity(engine, "calibration", "ok", f"Калибровка сканера: множитель комиссий {cal['factor']:.2f} "
+                         "(часовая оценка против точной модели WBTC/USDC 0,3%)", cal)
     if allow_daily and ds is not None and study is not None and daily_due(engine, now):
         from backend.backtesting.dataset import cached_state_at
         cal = step(engine, "calibration", calibrate_fees, engine, cfg, ds, lambda b: cached_state_at(ds, b))

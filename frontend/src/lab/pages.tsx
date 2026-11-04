@@ -245,6 +245,7 @@ function PosCard({ p }: { p: Any }) {
         <span className="vpos-tags"><Badge label={p.kind === "exact" ? "MODELED" : "ESTIMATED"} />
           {m.in_range != null && <Pill tone={m.in_range ? "pos" : "neg"}>{m.in_range ? "в диапазоне" : "вне диапазона"}</Pill>}</span></div>
       <div className="vpos-desc">{p.strategy_ru ?? p.strategy}</div>
+      {p.entry.forecast_note && <div className="vpos-desc muted">⚠ {p.entry.forecast_note}</div>}
       <div className="vpos-grid">
         {cell("Открыта", date(p.opened_at).replace(/\s\d{4}\sг\.,/, ",").replace(" МСК", ""))}
         {cell("Цена входа", num(p.entry.price, p.entry.price >= 1000 ? 0 : 2))}
