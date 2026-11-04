@@ -388,11 +388,14 @@ export function Bot() {
               ["Диапазон", `${num(e.range[0], e.range[0] >= 1000 ? 0 : 2)} – ${num(e.range[1], e.range[1] >= 1000 ? 0 : 2)}`],
               ["Цена сейчас", m.price != null ? num(m.price, m.price >= 1000 ? 0 : 2) : "—"],
               ["Вложено", usd(c.allocation_usd, 2)], ["Стоимость", m.value_usd != null ? usd(m.value_usd, 2) : "—"],
-              ["Комиссии", m.fees_usd != null ? usd(m.fees_usd, 2) : "—"], ["Потеря к хранению", m.il_usd != null ? usd(m.il_usd, 2) : "—"],
-              ["Расходы", m.costs_usd != null ? usd(m.costs_usd, 2) : "—"], ["К хранению", m.vs_hodl_usd != null ? usd(m.vs_hodl_usd, 2) : "—"],
+              ["Итог", m.net_usd != null ? usd(m.net_usd, 2) : "—", sign(m.net_usd)],
+              ["К хранению", m.vs_hodl_usd != null ? usd(m.vs_hodl_usd, 2) : "—", sign(m.vs_hodl_usd)],
+              ["Комиссии", m.fees_usd != null ? usd(m.fees_usd, 2) : "—", "pos"],
+              ["Потеря к хранению", m.il_usd != null ? usd(m.il_usd, 2) : "—", sign(m.il_usd)],
+              ["Расходы", m.costs_usd != null ? usd(m.costs_usd, 2) : "—"],
               ["Прогноз за неделю", `${usd(e.forecast.net_vs_hodl_usd[0], 2)} … ${usd(e.forecast.net_vs_hodl_usd[1], 2)}`],
-              ["Время в диапазоне", m.time_in_range != null ? pctAbs(m.time_in_range, 0) : "—"]] as [string, string][])
-              .map(([l, v]) => <div key={l}><span>{l}</span><b>{v}</b></div>)}
+              ["Время в диапазоне", m.time_in_range != null ? pctAbs(m.time_in_range, 0) : "—"]] as [string, string, string?][])
+              .map(([l, v, tone]) => <div key={l}><span>{l}</span><b className={tone ?? ""}>{v}</b></div>)}
           </div></>}
       </Card>
       <Card title="Журнал решений бота">
@@ -427,14 +430,14 @@ export function Positions() {
   const NET: Record<string, string> = { ethereum: "Ethereum", base: "Base", arbitrum: "Arbitrum", optimism: "Optimism" };
   const card = (p: Any) => {
     const m = p.mark ?? {}, a = p.advice;
-    const cells: [string, string][] = [
+    const cells: [string, string, string?][] = [
       ["Выбран", short(p.created_at)],
       ["Цена входа", num(p.entry.price, p.entry.price >= 1000 ? 0 : 2)],
       ["Диапазон", `${num(p.range[0], p.range[0] >= 1000 ? 0 : 2)} – ${num(p.range[1], p.range[1] >= 1000 ? 0 : 2)}`],
       ["Цена сейчас", m.price != null ? num(m.price, m.price >= 1000 ? 0 : 2) : "—"],
-      ["Стоимость", m.value_usd != null ? usd(m.value_usd, 2) : "—"], ["Итог", m.net_usd != null ? usd(m.net_usd, 2) : "—"],
-      ["Комиссии", m.fees_usd != null ? usd(m.fees_usd, 2) : "—"], ["Потеря к хранению", m.il_usd != null ? usd(m.il_usd, 2) : "—"],
-      ["Расходы (оценка)", usd(p.entry.costs_usd, 2)], ["К хранению", m.vs_hodl_usd != null ? usd(m.vs_hodl_usd, 2) : "—"],
+      ["Стоимость", m.value_usd != null ? usd(m.value_usd, 2) : "—"], ["Итог", m.net_usd != null ? usd(m.net_usd, 2) : "—", sign(m.net_usd)],
+      ["Комиссии", m.fees_usd != null ? usd(m.fees_usd, 2) : "—", "pos"], ["Потеря к хранению", m.il_usd != null ? usd(m.il_usd, 2) : "—", sign(m.il_usd)],
+      ["Расходы (оценка)", usd(p.entry.costs_usd, 2)], ["К хранению", m.vs_hodl_usd != null ? usd(m.vs_hodl_usd, 2) : "—", sign(m.vs_hodl_usd)],
       ["Время в диапазоне", m.time_in_range != null ? pctAbs(m.time_in_range, 0) : "—"],
       ["Прогноз за неделю", p.entry.card?.net_usd ? `${usd(p.entry.card.net_usd[0], 2)} … ${usd(p.entry.card.net_usd[1], 2)}` : "—"]];
     return (
@@ -442,7 +445,7 @@ export function Positions() {
         <div className="vpos-head"><b>{p.pair}</b> · {NET[p.network] ?? p.network} · {usd(p.amount_usd)}
           <span className="vpos-tags">{a && <Pill tone={ADVICE_TONE[a.code]}>{a.title}</Pill>}</span></div>
         {a && <p>{a.text}</p>}
-        <div className="vpos-grid">{cells.map(([l, v]) => <div key={l}><span>{l}</span><b>{v}</b></div>)}</div>
+        <div className="vpos-grid">{cells.map(([l, v, tone]) => <div key={l}><span>{l}</span><b className={tone ?? ""}>{v}</b></div>)}</div>
         {p.history.length > 0 && <details><summary>История советов ({p.history.length})</summary>
           <ul>{p.history.map((h: Any, i: number) => <li key={i}>{date(h.at)} · {h.title} (итог тогда {usd(h.net_usd, 2)})</li>)}</ul></details>}
         <p className="muted"><a href={`https://github.com/${d.repo}/issues/${p.issue}`} target="_blank" rel="noopener">заявка #{p.issue} на GitHub</a>
