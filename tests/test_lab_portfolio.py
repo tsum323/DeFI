@@ -98,3 +98,12 @@ def test_strategy_names_in_plain_russian():
                            "новый диапазон вокруг цены через ~1 ч")
     assert "не меняется" in describe(StrategyParams(width_pct=0.2)) and "поровну" in describe(StrategyParams(width_pct=0.2))
     assert describe_static("static ±10%") == "диапазон ±10% от цены; диапазон не меняется"
+
+
+def test_mark_exact_vs_hodl_includes_swap_cost():
+    """SYNTHETIC numbers: "К хранению" = fees + loss vs holding - gas - swap, for both kinds."""
+    from types import SimpleNamespace
+    res = {"days": 1.0, "net_a": 7_440_000, "fees_a": 1_660_000, "il": -620_000, "gas_cost": 1_460_000,
+           "swap_cost": 1_370_000, "vs_hodl_a": -420_000, "now": {"in_range": True, "price": 1.0}}
+    m = pf.mark_exact(SimpleNamespace(allocation_usd=1500.0), res)
+    assert math.isclose(m["vs_hodl_usd"], m["fees_usd"] + m["il_usd"] - m["costs_usd"])

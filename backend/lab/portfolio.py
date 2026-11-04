@@ -145,7 +145,9 @@ def mark_exact(row, ft_result: dict | None, decimals1: int = 6) -> dict | None:
     return {"days": ft_result["days"], "value_usd": row.allocation_usd + ft_result["net_a"] / u,
             "net_usd": ft_result["net_a"] / u, "fees_usd": ft_result["fees_a"] / u,
             "il_usd": ft_result.get("il", 0) / u, "costs_usd": (ft_result["gas_cost"] + ft_result.get("swap_cost", 0)) / u,
-            "vs_hodl_usd": ft_result["vs_hodl_a"] / u, "in_range": (ft_result.get("now") or {}).get("in_range"),
+            # the replay's benchmark holds the tokens AFTER the entry swap, so its vs_hodl leaves the
+            # swap cost out; here it is included, as for estimated positions (fees + loss - all costs)
+            "vs_hodl_usd": (ft_result["vs_hodl_a"] - ft_result.get("swap_cost", 0)) / u, "in_range": (ft_result.get("now") or {}).get("in_range"),
             "time_in_range": ft_result.get("time_in_range"), "price": (ft_result.get("now") or {}).get("price"),
             "rebalances": ft_result.get("rebalances"), "label": "MODELED"}
 
