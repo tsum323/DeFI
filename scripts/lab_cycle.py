@@ -34,6 +34,28 @@ def main() -> None:
     out = run_tick(engine, cfg, client=client, ds=ds, study=study, version=code_version(),
                    report_dir=ROOT / "data_snapshots" / "reports", allow_daily=not args.no_daily)
     print("lab cycle:", out)
+    report_state(engine, cfg)
+
+
+def report_state(engine, cfg) -> None:
+    """Short check lines for the run log: open portfolio positions and hourly-data coverage."""
+    import json
+    import time
+
+    from sqlalchemy import func, select
+    with engine.connect() as c:
+        for r in c.execute(select(S.portfolio_positions).order_by(S.portfolio_positions.c.id)):
+            m = json.loads(r.mark_json) if r.mark_json else {}
+            print(f"  position {r.id} {r.status} {r.kind} {r.pool} {r.strategy} ${r.allocation_usd:.0f}: "
+                  + ", ".join(f"{k}={m[k]:.2f}" for k in ("days", "net_usd", "fees_usd", "il_usd", "costs_usd",
+                                                           "vs_hodl_usd") if isinstance(m.get(k), (int, float)))
+                  + (f" note={m['note']}" if m.get("note") else ""))
+        now = int(time.time())
+        for pool, n, lo, hi, sw in c.execute(select(
+                S.pool_hours.c.pool, func.count(), func.min(S.pool_hours.c.hour_ts), func.max(S.pool_hours.c.hour_ts),
+                func.avg(S.pool_hours.c.swaps)).group_by(S.pool_hours.c.pool)):
+            print(f"  hours {pool}: n={n} from={(now - lo) / 86400:.1f}d ago to={(now - hi) / 3600:.1f}h ago "
+                  f"swaps/h={sw:.0f}")
 
 
 if __name__ == "__main__":
