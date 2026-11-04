@@ -14,7 +14,7 @@ import lzma
 import shutil
 from pathlib import Path
 
-from sqlalchemy import insert, select
+from sqlalchemy import select
 
 from backend.data_engine.sync import _insert_ignore
 from backend.database import schema as S
@@ -47,16 +47,32 @@ def export_research(engine, out_dir: Path, optuna_db: Path | None = None) -> dic
     return manifest
 
 
-def restore_research(engine, src_dir: Path, optuna_db: Path | None = None) -> dict:
+# Research results: only ever added to (by sessions and the daily research). Everything else
+# is LIVE state that changes in place (positions, marks, scan progress, learned parameters).
+RESEARCH_TABLES = ("strategies", "datasets", "experiments", "validation_reports", "hypotheses",
+                   "hypothesis_experiments")
+
+
+def restore_research(engine, src_dir: Path, optuna_db: Path | None = None, *, mirror_live: bool = False,
+                     only: tuple[str, ...] | None = None) -> dict:
+    """Merge a saved state into the database.
+    Research tables: rows are added, existing ones kept (append-only history).
+    Live tables: with `mirror_live` the saved state REPLACES what the database holds (it is the
+    newer one: rows that changed or were deleted since must not survive from an older copy);
+    without it, rows are only added (used for an older snapshot, e.g. the committed one)."""
     manifest = json.loads((src_dir / "manifest.json").read_text())
     out = {}
     with engine.begin() as conn:
         for name, meta in manifest["tables"].items():
+            if only is not None and name not in only:
+                continue
             blob = lzma.decompress((src_dir / f"{name}.jsonl.xz").read_bytes())
             if hashlib.sha256(blob).hexdigest() != meta["sha256"]:
                 raise ValueError(f"{name}: checksum mismatch")
             rows = [json.loads(line) for line in blob.decode().splitlines() if line]
             t = getattr(S, name)
+            if mirror_live and name not in RESEARCH_TABLES:
+                conn.execute(t.delete())
             for i in range(0, len(rows), 2000):
                 _insert_ignore(conn, t, rows[i:i + 2000])
             out[name] = len(rows)

@@ -12,7 +12,11 @@ import os
 from backend.core.config import load_config
 from backend.data_engine.abi import POOL_EVENTS
 from backend.data_engine.rpc import (
-    BadEndpointConfig, EndpointUnavailable, RangeTooLarge, RpcClient, RpcError,
+    BadEndpointConfig,
+    EndpointUnavailable,
+    RangeTooLarge,
+    RpcClient,
+    RpcError,
 )
 
 SWAP_TOPIC = next(e.topic0 for e in POOL_EVENTS if e.name == "Swap")

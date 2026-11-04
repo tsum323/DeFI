@@ -16,15 +16,19 @@ import argparse
 import sys
 
 from backend.ai_researcher.adapter import AnthropicAdapter, FileAdapter, LLMError
-from backend.ai_researcher.research import (attach_commentary, build_context, run_cycle,
-                                            tested_hypotheses)
+from backend.ai_researcher.research import (
+    attach_commentary,
+    build_context,
+    run_cycle,
+    tested_hypotheses,
+)
 from backend.ai_researcher.schema import Commentary
-from backend.validation.segments import load_segment_table
 from backend.backtesting.dataset import ROOT, load_dataset
 from backend.core.config import load_config
 from backend.database import schema as S
 from backend.strategies.generator import DEFAULT_SPACE, generate
 from backend.strategies.mass_test import code_version, relabel_commit_versions
+from backend.validation.segments import load_segment_table
 from backend.validation.study import setup_study
 
 

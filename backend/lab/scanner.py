@@ -249,6 +249,44 @@ def store_hours(conn, agg: dict[tuple[str, int], dict]) -> None:
                                  last_block=h["last_block"]))
 
 
+def _ts_ok(lg: dict) -> bool:
+    try:
+        return int(lg.get("blockTimestamp") or "0x0", 16) > 1_400_000_000
+    except (TypeError, ValueError):
+        return False
+
+
+def fill_timestamps(client, logs: list[dict], lo: int, hi: int) -> None:
+    """Some endpoints (e.g. Arbitrum's public node) return logs without `blockTimestamp`.
+    Then the timestamps of the window's first and last block are read and the rest are
+    interpolated by block number (hourly buckets only; ESTIMATED to within minutes)."""
+    if not logs or all(_ts_ok(lg) for lg in logs):
+        return
+    t_lo = int(client.call("eth_getBlockByNumber", [hex(lo), False])["timestamp"], 16)
+    t_hi = int(client.call("eth_getBlockByNumber", [hex(hi), False])["timestamp"], 16) if hi != lo else t_lo
+    span = max(1, hi - lo)
+    for lg in logs:
+        if not _ts_ok(lg):
+            b = int(lg["blockNumber"], 16)
+            lg["blockTimestamp"] = hex(int(t_lo + (t_hi - t_lo) * (b - lo) / span))
+
+
+def repair_bad_hours(engine, cfg) -> list[str]:
+    """Networks whose stored hours have impossible timestamps (before 2015) are wiped and
+    re-loaded from scratch (their scan state is removed). Returns the networks repaired."""
+    from sqlalchemy import delete
+    with engine.connect() as c:
+        bad = {r.pool for r in c.execute(select(S.pool_hours.c.pool).where(S.pool_hours.c.hour_ts < 1_400_000_000).distinct())}
+    nets = sorted({cfg.pools[k].network for k in bad if k in cfg.pools})
+    if not nets:
+        return []
+    keys = [k for k, p in cfg.pools.items() if p.network in nets]
+    with engine.begin() as c:
+        c.execute(delete(S.pool_hours).where(S.pool_hours.c.pool.in_(keys)))
+        c.execute(delete(S.scan_state).where(S.scan_state.c.stream.in_([stream_for(n) for n in nets])))
+    return nets
+
+
 def stream_for(network: str) -> str:
     return STREAM if network == "ethereum" else f"{STREAM}:{network}"
 
@@ -288,6 +326,7 @@ def ingest(engine, client, pools: list[ScanPool], *, backfill_days: int = 30, st
             batch = 1
             continue
         logs = sorted((lg for r in res for lg in r), key=lambda g: (int(g["blockNumber"], 16), int(g["logIndex"], 16)))
+        fill_timestamps(client, logs, ranges[0][0], ranges[-1][1])
         with engine.begin() as conn:
             store_hours(conn, aggregate_logs(logs, by_addr))
             values = {"first_block": first, "last_block": ranges[-1][1], "updated_at": int(time.time())}
@@ -517,9 +556,18 @@ def scan(engine, clients, cfg, pools: list[ScanPool], now: int | None = None,
     # volatility per PAIR, from its most active pool (thin pools have stale closes)
     pair_vol = {}
     for pk in {p.asset_pair for p in pools}:
-        same = [p for p in pools if p.asset_pair == pk]
-        top = max(same, key=lambda p: sum(h.swaps for h in by_pool.get(p.key, [])))
-        pair_vol[pk] = realized_vol([h for h in by_pool.get(top.key, []) if h.hour_ts >= now - 7 * DAY], top)
+        # the most active pool over the LAST 7 days that has most of those hours (a network
+        # still loading its history has old hours only and must not decide the volatility)
+        cands = []
+        for p in (q for q in pools if q.asset_pair == pk and q.network not in loading):
+            recent = [h for h in by_pool.get(p.key, []) if h.hour_ts >= now - 7 * DAY]
+            if len(recent) >= 24 * 5:
+                cands.append((sum(h.swaps for h in recent), p, recent))
+        if cands:
+            _, top, recent = max(cands, key=lambda x: x[0])
+            pair_vol[pk] = realized_vol(recent, top)
+        else:
+            pair_vol[pk] = None
     results = []
     for p in pools:
         if p.key not in states:
@@ -576,6 +624,8 @@ def scan(engine, clients, cfg, pools: list[ScanPool], now: int | None = None,
         ok = [r for r in ranges if r["exit_probability"] <= 0.5] or ranges
         best = max(ok, key=lambda r: r["net_mid_usd"] * (1 - r["exit_probability"])) if ok else None
         quality = []
+        if sigma is None:
+            quality.append("нет надёжной оценки волатильности — шанс выхода из диапазона не посчитать")
         if p.network in loading:
             quality.append("история этой сети ещё загружается — оценка появится после загрузки")
         if span_days < 7:

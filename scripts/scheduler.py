@@ -15,8 +15,8 @@ from datetime import datetime, timezone
 
 from sqlalchemy import select
 
-from backend.core.config import load_config
 from backend.automation.scheduler import Scheduler, jobs_from_config
+from backend.core.config import load_config
 from backend.database import schema as S
 
 

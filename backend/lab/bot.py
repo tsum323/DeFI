@@ -189,6 +189,10 @@ def tick(engine, cfg, scan: dict | None, scan_pools: dict, hours_by_pool: dict, 
                          + (f"лучший вариант сейчас ({_describe(best)}) выгоднее недостаточно, чтобы окупить переезд"
                             if best["pool"] != row.pool else "она и есть лучший вариант"))
             if row is not None:
+                set_state(engine, "bot_status", {"at": now, "text": (
+                    "держу позицию: цена " + ("внутри диапазона, комиссии идут" if m.get("in_range", True)
+                                              else "вне диапазона — жду возврата (до " + str(bc["out_of_range_hours"]) + " ч)")
+                    + (f"; лучший вариант сейчас — {_describe(best)}" if best and best["pool"] != row.pool else ""))})
                 return {"action": "hold", "value_usd": amount}
     # no position: open the best affordable option
     amount = cash(engine, cfg)
@@ -201,6 +205,7 @@ def tick(engine, cfg, scan: dict | None, scan_pools: dict, hours_by_pool: dict, 
             set_state(engine, "bot_wait", {"day": day})
             _say(engine, "info", f"Бот ждёт: при ${amount:,.2f} ни один вариант не окупает газ и обмен "
                  "(или цена скорее всего выйдет из диапазона за неделю)")
+        set_state(engine, "bot_status", {"at": now, "text": f"жду: при ${amount:,.2f} ни один вариант не окупает расходы"})
         return {"action": "wait", "cash_usd": amount}
     o = good[0]
     alt = [x for x in good[1:] if x["network"] != o["network"]][:1]
@@ -208,6 +213,7 @@ def tick(engine, cfg, scan: dict | None, scan_pools: dict, hours_by_pool: dict, 
            f"к простому хранению, газ ${o['gas_usd']:,.2f}, шанс выхода из диапазона {o['exit_probability']:.0%}"
            + (f"; следующий — {_describe(alt[0])} (${alt[0]['net_mid_usd']:,.2f})" if alt else ""))
     _open_position(engine, scan, o, amount, now, why)
+    set_state(engine, "bot_status", {"at": now, "text": f"открыл позицию: {_describe(o)}"})
     return {"action": "open", "option": o}
 
 
@@ -229,7 +235,12 @@ def summary(engine, cfg, now: int | None = None) -> dict:
     return {"start_usd": start, "balance_usd": balance, "pnl_usd": balance - start, "pnl_pct": balance / start - 1,
             "current": cur, "closed": [p for p in pos if p["status"] == "closed"][::-1],
             "history": [json.loads(h.payload_json) for h in hist], "decisions": decisions,
-            "trust": trust(engine), "rules": _cfg(cfg), "label": "ESTIMATED"}
+            "trust": trust(engine), "rules": _cfg(cfg), "status": _status(engine), "label": "ESTIMATED"}
+
+
+def _status(engine) -> dict | None:
+    from backend.lab.scanner import get_state
+    return get_state(engine, "bot_status")
 
 
 def snapshot_day(engine, s: dict, now: int | None = None) -> None:

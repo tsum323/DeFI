@@ -184,7 +184,7 @@ def main() -> None:
 
 
 def write_report(R: dict) -> None:
-    ok = lambda v: "✅" if v.get("ok") else ("⏭️" if v.get("ok") is None else "❌")  # noqa: E731
+    ok = lambda v: "✅" if v.get("ok") else ("⏭️" if v.get("ok") is None else "❌")
     m, c, f, dd, v, la, sec, t = (R["math"], R["checkpoints"], R["fees"], R["drawdown"], R["validation"],
                                   R["lookahead"], R["security"], R["tests"])
     now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")

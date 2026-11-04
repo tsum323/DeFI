@@ -18,8 +18,8 @@ from pathlib import Path
 
 from backend.core.config import load_config
 from backend.data_engine.snapshot import export_pool, restore_pool
-from backend.database.research_snapshot import export_research, restore_research
 from backend.database import schema as S
+from backend.database.research_snapshot import export_research, restore_research
 
 ROOT = Path(__file__).resolve().parent.parent
 SIDE_FILES = ("pool_verification.json", "fee_tier_comparison.json", "gas_calibration.json",
@@ -34,6 +34,9 @@ def main() -> None:
     ap.add_argument("--pool", default=cfg.primary_pool)
     ap.add_argument("--research-dir", default="data_snapshots/research_db",
                     help="research state directory (relative to the repo)")
+    ap.add_argument("--mirror-live", action="store_true",
+                    help="the saved state is newer: it replaces live tables instead of adding to them")
+    ap.add_argument("--research-only", action="store_true", help="restore only the research tables")
     args = ap.parse_args()
     p = cfg.pools[args.pool]
     chain_id = cfg.networks[p.network].chain_id
@@ -47,7 +50,9 @@ def main() -> None:
         print({k: v["rows"] for k, v in m["tables"].items()})
         return
     if args.action == "restore-research":
-        print(restore_research(engine, research_dir, optuna_db))
+        from backend.database.research_snapshot import RESEARCH_TABLES
+        print(restore_research(engine, research_dir, optuna_db, mirror_live=args.mirror_live,
+                               only=RESEARCH_TABLES if args.research_only else None))
         return
     if args.action == "export":
         m = export_pool(engine, chain_id, p.address, snap)

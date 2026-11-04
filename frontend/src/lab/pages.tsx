@@ -374,6 +374,7 @@ export function Bot() {
         <Stat title="Позиций было" value={(d.closed.length + (c ? 1 : 0)).toString()} hint={`закрыто ${d.closed.length}`} />
         <Stat title="Сейчас в" value={c ? `${NET[c.network] ?? c.network}` : "ждёт"} hint={c ? c.pair : ""} />
       </div>
+      {d.status && <p className="muted">Последняя проверка ботом: {date(d.status.at)} — {d.status.text}.</p>}
       {d.history.length > 1 && <Card title="Баланс по дням"><Spark values={d.history.map((h: Any) => h.balance_usd)} /></Card>}
       <Card title="Текущая позиция">
         {!c ? <p className="muted">Позиции нет: бот ждёт подходящего варианта (см. журнал решений).</p> : <>

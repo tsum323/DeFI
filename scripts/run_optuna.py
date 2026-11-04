@@ -24,7 +24,11 @@ from backend.optimizer.optuna_study import OBJECTIVE, best_params, optimize
 from backend.strategies.generator import BASE_STRATEGIES
 from backend.strategies.mass_test import dataset_descriptor, relabel_commit_versions
 from backend.validation.robustness import score_strategies
-from backend.validation.segments import load_segment_table, make_segments, run_segment_table
+from backend.validation.segments import (
+    load_segment_table,
+    make_segments,
+    run_segment_table,
+)
 
 
 def _ts(day: str) -> int:

@@ -133,9 +133,15 @@ def main() -> None:
             shutil.copy2(snap / name, ROOT / "data" / name)
     # idempotent merges: first the committed state (new experiments pushed from a session),
     # then the live state kept in the Actions cache (signals, forward tests since the last commit)
-    run("scripts.data_snapshot", "restore-research")
+    # The pool database comes from a once-a-day cache, so it is older than both saved states:
+    #  - the live state (Actions cache, previous run) is the newest: it REPLACES live tables;
+    #  - the committed snapshot adds research results pushed from a session (append-only).
+    # Without a live state (first run, cache evicted) the committed snapshot is the newest.
     if (ROOT / LIVE_STATE / "manifest.json").exists():
-        run("scripts.data_snapshot", "restore-research", "--research-dir", LIVE_STATE)
+        run("scripts.data_snapshot", "restore-research", "--research-dir", LIVE_STATE, "--mirror-live")
+        run("scripts.data_snapshot", "restore-research", "--research-only")
+    else:
+        run("scripts.data_snapshot", "restore-research", "--mirror-live")
     engine = S.make_engine(cfg.lab["database"]["url"])
     before = latest_signal(engine)
     watch_before = watch_names(engine)

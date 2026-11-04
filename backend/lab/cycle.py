@@ -53,6 +53,30 @@ def step(engine, kind: str, fn, *args, **kw):
         return None
 
 
+DATA_FIX = "data_fix_2026_11_04"
+
+
+def repair_once(engine, cfg) -> bool:
+    """One-time repair after the restore bug of 2026-11-03/04: the once-a-day database cache
+    kept old scan progress, so the same Swap events were added to the hourly data again on
+    every update (fees inflated many times). The hourly data and the scan progress are rebuilt
+    from scratch, and the bot (whose decisions used the inflated numbers) starts again."""
+    from backend.lab.scanner import get_state, set_state
+    if get_state(engine, DATA_FIX):
+        return False
+    with engine.begin() as c:
+        for t in (S.pool_hours, S.scan_state, S.scan_results, S.bot_positions, S.bot_history):
+            c.execute(t.delete())
+        c.execute(S.lab_state.delete().where(S.lab_state.c.key.in_(["bot_trust", "bot_review", "bot_wait"])))
+    set_state(engine, DATA_FIX, {"done": True})
+    log_activity(engine, "data", "warn", "Исправлена ошибка данных: с вечера 3 ноября обмены одних и тех же блоков "
+                 "засчитывались повторно, и комиссии в приближённых оценках были завышены во много раз. Часовые данные "
+                 "всех пулов удалены и загружаются заново; оценки пересчитаются автоматически.")
+    log_activity(engine, "bot", "warn", "Бот перезапущен с $100: его прошлые решения (и результат +23%) опирались на "
+                 "завышенные из-за ошибки данных комиссии. Это был ненастоящий результат.")
+    return True
+
+
 def latest_ranking(engine) -> dict | None:
     with engine.connect() as c:
         v = c.execute(select(S.opportunity_rankings.c.payload_json).order_by(
@@ -142,6 +166,7 @@ def run_tick(engine, cfg, *, client, ds=None, study=None, version: str | None = 
         NETWORK_RU,
         calibrate_fees,
         ingest_all,
+        repair_bad_hours,
         save_scan,
         scan,
         scan_pools,
@@ -152,6 +177,10 @@ def run_tick(engine, cfg, *, client, ds=None, study=None, version: str | None = 
     out: dict = {}
     sc = cfg.lab["scanner"]
     pools = scan_pools(cfg, sc["pools"])
+    step(engine, "data", repair_once, engine, cfg)
+    for net in step(engine, "data", repair_bad_hours, engine, cfg) or []:
+        log_activity(engine, "data", "warn", f"{NETWORK_RU.get(net, net)}: найдено неверное время обменов — "
+                     "часовые данные этой сети удалены и загружаются заново")
     nets = {p.network for p in pools}
     fallbacks, errors = scanner_clients(cfg, nets - {"ethereum"}, with_fallbacks=True)
     clients = {n: cs[0] for n, cs in fallbacks.items()}

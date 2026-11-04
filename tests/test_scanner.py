@@ -103,7 +103,7 @@ class FakeClient:
 def test_ingest_is_incremental(tmp_path):
     engine = S.make_engine(f"sqlite:///{tmp_path / 'lab.sqlite'}")
     sp = sqrt_for(80_000, WBTC_USDC)
-    logs = [swap_log(WBTC_USDC, b, 3600 * (b // 100), 10 ** 6, -800 * 10 ** 6, sp, 10, 1) for b in range(1000, 1300, 7)]
+    logs = [swap_log(WBTC_USDC, b, 1_700_000_000 + 3600 * (b // 100), 10 ** 6, -800 * 10 ** 6, sp, 10, 1) for b in range(1000, 1300, 7)]
     c = FakeClient(1206, logs)
     r1 = ingest(engine, c, [WBTC_USDC], start_block=1000, step=50, confirmations=6)
     assert r1["complete"] and r1["to_block"] == 1200
