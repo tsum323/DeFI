@@ -219,7 +219,6 @@ def tick(engine, cfg, scan: dict | None, scan_pools: dict, hours_by_pool: dict, 
 
 def summary(engine, cfg, now: int | None = None) -> dict:
     now = now or int(time.time())
-    from backend.lab.activity import recent_activity
     with engine.connect() as c:
         rows = c.execute(select(S.bot_positions).order_by(S.bot_positions.c.id)).all()
         hist = c.execute(select(S.bot_history).order_by(S.bot_history.c.day)).all()
@@ -231,10 +230,19 @@ def summary(engine, cfg, now: int | None = None) -> dict:
            for r in rows]
     cur = next((p for p in pos if p["status"] == "open"), None)
     balance = (cur["mark"] or {}).get("value_usd", cur["allocation_usd"]) if cur else cash(engine, cfg)
-    decisions = [a for a in recent_activity(engine, 400) if a["kind"] == "bot"][:60]
+    # the bot's own journal (queried by kind, so other activity cannot push it out); entries
+    # before the latest restart belong to the previous run and are returned separately
+    with engine.connect() as c:
+        arows = c.execute(select(S.activity).where(S.activity.c.kind == "bot")
+                          .order_by(S.activity.c.id.desc()).limit(200)).all()
+    log = [{"id": r.id, "at": r.created_at, "kind": r.kind, "status": r.status, "message": r.message}
+           for r in arows]
+    cut = next((i for i, a in enumerate(log) if a["message"].startswith("Бот перезапущен")), None)
+    decisions, before_restart = (log, []) if cut is None else (log[:cut + 1], log[cut + 1:])
     return {"start_usd": start, "balance_usd": balance, "pnl_usd": balance - start, "pnl_pct": balance / start - 1,
             "current": cur, "closed": [p for p in pos if p["status"] == "closed"][::-1],
-            "history": [json.loads(h.payload_json) for h in hist], "decisions": decisions,
+            "history": [json.loads(h.payload_json) for h in hist], "decisions": decisions[:80],
+            "decisions_before_restart": before_restart[:40],
             "trust": trust(engine), "rules": _cfg(cfg), "status": _status(engine), "label": "ESTIMATED"}
 
 
