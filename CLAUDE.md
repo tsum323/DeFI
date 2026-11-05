@@ -29,8 +29,10 @@
 - Не переходить к следующему этапу при критических ошибках.
 - Работа ведётся в ветке `stage-1-architecture` (или новой ветке этапа от неё), `git push -u origin <ветка>`.
 
-- Сайт публикует собранную версию из `site/`. После любого изменения `frontend/src`: `cd frontend && npm run build`,
-  затем заменить `site/index.html` и `site/assets/` содержимым `frontend/dist/` и закоммитить вместе с кодом.
+- Сайт публикует собранную версию из `site/`. После любого изменения `frontend/src` собирать ТОЛЬКО так:
+  `cd frontend && npx tsc -b && VITE_STATIC=1 npx vite build --base=./ --outDir dist-static`, затем заменить
+  `site/index.html` и `site/assets/` содержимым `frontend/dist-static/` и закоммитить вместе с кодом
+  (обычный `npm run build` даёт пути `/assets/...` и режим API — на GitHub Pages страница будет пустой).
 
 ## Окружение
 - Доступ к данным: Alchemy, ключ в переменной окружения `ETH_RPC_URL`. Никогда не выводить
