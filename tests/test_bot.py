@@ -85,3 +85,19 @@ def test_bot_moves_early_only_for_a_much_better_option(tmp_path):
     h = {ETH.key: hours(ETH, sp_e, pos_e, 3, t0)}
     bot.tick(engine, cfg, scan2, {ETH.key: ETH, BASE.key: BASE}, h, now=t0 + 3 * 3600)
     assert bot._open(engine).network == "base" and len(bot._closed(engine)) == 1
+
+
+def test_summary_splits_journal_at_restart(tmp_path):
+    """SYNTHETIC journal: entries before "Бот перезапущен" go to decisions_before_restart."""
+    from backend.core.config import load_config
+    from backend.database import schema as S
+    from backend.lab import bot
+    from backend.lab.activity import log_activity
+    engine = S.make_engine(f"sqlite:///{tmp_path / 'lab.sqlite'}")
+    log_activity(engine, "bot", "info", "Бот открыл позицию A")
+    log_activity(engine, "bot", "warn", "Бот перезапущен с $100")
+    log_activity(engine, "portfolio", "info", "другое")
+    log_activity(engine, "bot", "info", "Бот открыл позицию B")
+    s = bot.summary(engine, load_config())
+    assert [a["message"] for a in s["decisions"]] == ["Бот открыл позицию B", "Бот перезапущен с $100"]
+    assert [a["message"] for a in s["decisions_before_restart"]] == ["Бот открыл позицию A"]

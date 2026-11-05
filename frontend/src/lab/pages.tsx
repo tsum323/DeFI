@@ -401,6 +401,10 @@ export function Bot() {
       <Card title="Журнал решений бота">
         {d.decisions.length === 0 ? <p className="muted">Решений пока нет — бот начнёт со следующего обновления.</p> :
           d.decisions.map((a: Any) => <div className="log-item" key={a.id}><span className="muted">{date(a.at)}</span><span>{a.message}</span></div>)}
+        {(d.decisions_before_restart ?? []).length > 0 && <details><summary className="muted">
+          Решения до перезапуска 4 ноября ({d.decisions_before_restart.length}) — опирались на ошибочные данные, их результаты ненастоящие</summary>
+          {d.decisions_before_restart.map((a: Any) => <div className="log-item muted" key={a.id}><span>{date(a.at)}</span><span>{a.message}</span></div>)}
+        </details>}
       </Card>
       {d.closed.length > 0 && <Card title={`Закрытые позиции: ${d.closed.length}`}>
         <ul>{d.closed.map((p: Any) => <li key={p.id}>{date(p.opened_at)} → {date(p.closed_at)} · {p.pair} ({NET[p.network] ?? p.network}) ±{pctAbs(p.width, 0)}:
