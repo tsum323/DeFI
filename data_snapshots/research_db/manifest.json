@@ -1,16 +1,16 @@
 {
  "tables": {
   "activity": {
-   "rows": 1086,
-   "sha256": "49e5ac8c2a7abccdafb968fed840b6733a212b09921915ed83b08902416625d8"
+   "rows": 1512,
+   "sha256": "78c3b45fd414aee31eefcfb2e30f8830342ff47946d4d2c647d3d3d339764012"
   },
   "bot_history": {
-   "rows": 3,
-   "sha256": "68af9889188d59b5583a708582c07593c55db2376a9ff82acaafbe55ce12f95e"
+   "rows": 4,
+   "sha256": "4c693093738ec2e5bc4014ace12fe7505e6c7615133d3b823bf6ae1558c8b1ce"
   },
   "bot_positions": {
-   "rows": 1,
-   "sha256": "51ecceb855c14b391c4716c0b5f7b1916174f31b9b3168135b0d390dd9967b23"
+   "rows": 2,
+   "sha256": "eed53caac4f4d9f9723de2b39d4401de82ef979cf0ced39d334ca71bba4f2a34"
   },
   "datasets": {
    "rows": 43,
@@ -22,11 +22,11 @@
   },
   "forecasts": {
    "rows": 3,
-   "sha256": "25bb5b656006111cf0e6aff093a55551a9135c1cef994a56f3da630aeb7590b0"
+   "sha256": "976db1a636939067e87cf2d2bb1404af848199511ebf21de88673dd18cfd3765"
   },
   "forward_tests": {
    "rows": 18,
-   "sha256": "11eb365ba8349d04d034c4e6cd95ce55436a36895cbdd51e5fd28aeb0f064a99"
+   "sha256": "2188d38cb78e94708e8ecf8bedfdec5e639d52123e30fca8064ccb81c8033894"
   },
   "hypotheses": {
    "rows": 8,
@@ -41,16 +41,16 @@
    "sha256": "e04134c1b590548dce6cad510bb8efaa2b04549d8833b0bbf085b2ee7f8af8b3"
   },
   "lab_state": {
-   "rows": 8,
-   "sha256": "cfc3f217e014b45495479ac2d84f5d6477495970f01e255d9bab65eb4ec68fbd"
+   "rows": 10,
+   "sha256": "f2b8ad6d8908f01c8b30f20b732d02f1a27f3fba4c9bdefca1ebda3d4635c718"
   },
   "lessons": {
    "rows": 0,
    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
   },
   "market_evaluations": {
-   "rows": 376,
-   "sha256": "5f617af7a7aeec23ae303da258e6f44cb60ed94041f6a96393fc815300043f2d"
+   "rows": 459,
+   "sha256": "52f251a544f298446d14d6802deed5cf5f4af65de05e8d6842fbd8016763d93b"
   },
   "opportunity_events": {
    "rows": 589,
@@ -58,43 +58,43 @@
   },
   "opportunity_rankings": {
    "rows": 1,
-   "sha256": "83b42b85669c949e90142ae6d24f8724d824a8b06b980033c3d81bfc09f1ba10"
+   "sha256": "1bd8589e2d0863134d7062c9cebcb0e95899e7e1f70ce29a23eb77af6a672ea8"
   },
   "pool_hours": {
-   "rows": 8212,
-   "sha256": "c08b8e9823919bfe93f9f589dd71fc500eadf0323a0c822bb8a543f4ce223c74"
+   "rows": 8646,
+   "sha256": "4d4778c8171c4ca3aa381e3ee08a155130a6b02a8cfe6233f8338f2755375702"
   },
   "portfolio_history": {
-   "rows": 3,
-   "sha256": "c6d833c217729c95b64675c413f74c2eec26298ce660d6350b1fcc5774dce567"
+   "rows": 4,
+   "sha256": "b0883edf1ed4e038baf458cd9121729b51808d7f51512a2bab646224b42cd1fe"
   },
   "portfolio_positions": {
-   "rows": 8,
-   "sha256": "0ae91845eb1aa590cfc38fd9882111e5b44f8ef3b98b9cb5ce7d83e597ac6070"
+   "rows": 9,
+   "sha256": "b0e4c74c03f06a793cd67223e7056730c7b18e996c0c09dd9ffd273096a0c732"
   },
   "scan_results": {
    "rows": 1,
-   "sha256": "7edc1fca3ab97cbad1164e4fa30d80ce8f0a7c9db72e072e0bad2dfbe0342748"
+   "sha256": "fa74f7b59ed8fea92c5bfd2be30af9fe897fc5742153458d872220591c7ac245"
   },
   "scan_state": {
    "rows": 4,
-   "sha256": "b80e66a3770ac2fa52d99a904da7d94075d0477e4a1836cf9ebaa6ab67fde1c3"
+   "sha256": "f44c25595a1befb069f204f9ebba6cf9329c1bee3334d882d52425b4e4f404fe"
   },
   "signal_events": {
-   "rows": 7,
-   "sha256": "4c1b0feda863eaea1e271d76e7b67e5f9f8f1c4596a51b0c6da43111b27b9ac4"
+   "rows": 9,
+   "sha256": "970418ae13a38806e6ab3d1a058519771a7567176a73d6cd506cb14138dff142"
   },
   "signals": {
-   "rows": 7,
-   "sha256": "2a612ca92c6aa32b6cafb6c62e3ea0fbceb53dd3cf4e3018ea848f15c02b4546"
+   "rows": 9,
+   "sha256": "d9699107ec08c0d2cb0fac8a40ee0d2de37f2ae00f6fb16531ab9a77bff6b083"
   },
   "strategies": {
    "rows": 1018,
    "sha256": "23ce1eaf6a0d83c51834929706364927a6766e34049eae25fcd0c91ec7d66611"
   },
   "tracked_positions": {
-   "rows": 1,
-   "sha256": "df25e346beae2afad4ee925258a595cf16fa2912233bc539cad2ab678d3e0c16"
+   "rows": 2,
+   "sha256": "c1fadb6e5456314267eeca3506ed0614b847a7c9d893dfada01ce19d925f582f"
   },
   "validation_reports": {
    "rows": 936,
